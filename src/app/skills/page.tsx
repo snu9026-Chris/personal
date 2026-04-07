@@ -75,6 +75,15 @@ export default function SkillsPage() {
 
   useEffect(() => { fetchSkills(); }, [fetchSkills]);
 
+  // 탭 복귀 시 자동 갱신
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchSkills();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchSkills]);
+
   const handleSave = async () => {
     if (!skillName.trim() || !skillDesc.trim()) return;
     setSaving(true);

@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import { createRouteClient } from "./supabase-route";
 
+// 이 앱은 단일 사용자 전용. 아래 이메일만 접근 허용.
+const ALLOWED_EMAILS = new Set(["snu9026@gmail.com"]);
+
 /**
  * API 라우트에서 호출 — 현재 요청의 Supabase 세션을 검증한다.
- * 인증되지 않았으면 UnauthorizedError를 throw하므로 try/catch + handleApiError 안에서 호출할 것.
+ * 인증되지 않았거나 화이트리스트에 없는 이메일이면 UnauthorizedError를 throw한다.
+ * try/catch + handleApiError 안에서 호출할 것.
  */
 export async function requireUser() {
   const supabase = await createRouteClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
     throw new UnauthorizedError("로그인이 필요합니다.");
+  }
+  if (!user.email || !ALLOWED_EMAILS.has(user.email.toLowerCase())) {
+    throw new UnauthorizedError("이 계정은 접근 권한이 없습니다.");
   }
   return user;
 }

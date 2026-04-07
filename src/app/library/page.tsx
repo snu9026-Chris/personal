@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen, Search, Loader2, Tag, Trash2,
@@ -18,9 +18,7 @@ export default function LibraryPage() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => { fetchReports(); }, []);
-
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/reports");
@@ -31,7 +29,18 @@ export default function LibraryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  // 탭 복귀 시 자동 갱신
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchReports();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchReports]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("이 보고서를 삭제하시겠습니까?")) return;

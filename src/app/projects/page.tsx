@@ -74,15 +74,15 @@ export default function ProjectsPage() {
   const selectedProject = projects.find((p) => p.id === selectedId);
 
   // ── 프로젝트 목록 불러오기 ──
-  useEffect(() => {
-    fetch("/api/projects")
-      .then((r) => r.json())
-      .then(({ projects: data }) => {
-        setProjects(data ?? []);
-        if (data?.length > 0) setSelectedId(data[0].id);
-      })
-      .finally(() => setLoadingProjects(false));
-  }, []);
+  const fetchProjects = useCallback(async () => {
+    const res = await fetch("/api/projects");
+    const { projects: data } = await res.json();
+    setProjects(data ?? []);
+    if (data?.length > 0 && !selectedId) setSelectedId(data[0].id);
+    setLoadingProjects(false);
+  }, [selectedId]);
+
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   // ── 로그 불러오기 ──
   const fetchLogs = useCallback(async (projectId: string) => {
@@ -96,6 +96,17 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (selectedId) fetchLogs(selectedId);
   }, [selectedId, fetchLogs]);
+
+  // ── 탭 복귀 시 자동 갱신 ──
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      fetchProjects();
+      if (selectedId) fetchLogs(selectedId);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchProjects, fetchLogs, selectedId]);
 
   // ── 프로젝트 추가 ──
   const handleAddProject = async (name: string, description: string, color: string) => {

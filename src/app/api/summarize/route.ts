@@ -5,20 +5,10 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-function getApiKeyFromEnvFile(): string {
-  try {
-    const envPath = join(process.cwd(), ".env.local");
-    const content = readFileSync(envPath, "utf8");
-    const match = content.match(/^ANTHROPIC_API_KEY=(.+)$/m);
-    if (match) return match[1].trim();
-  } catch {}
-  return "";
-}
-
 function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY || getApiKeyFromEnvFile();
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY가 설정되지 않았습니다. .env.local 파일을 확인해주세요.");
+    throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
   }
   return new Anthropic({ apiKey });
 }
