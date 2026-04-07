@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>logic.summary 산출물 미리보기</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          50: '#f0fdfc', 100: '#ccfbf5', 200: '#99f6ec', 300: '#5eead4',
+          400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 900: '#134e4a'
+        }
+      },
+      fontFamily: { sans: ['Pretendard', 'system-ui', 'sans-serif'] }
+    }
+  }
+};
+</script>
+<style>
+body { font-family: 'Pretendard', system-ui, sans-serif; background: #fafaf9; }
+.slide-card { background: white; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 10px 30px -10px rgba(0,0,0,0.08); border: 1px solid #f1f5f4; }
+.badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+.key-banner { background: linear-gradient(to right, #f0fdfc, rgba(204,251,245,0.4)); border: 1px solid rgba(153,246,236,0.6); border-radius: 12px; padding: 14px; display: flex; gap: 10px; align-items: flex-start; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead { background: linear-gradient(to right, #f0fdfc, rgba(204,251,245,0.6)); }
+th { padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0f766e; font-weight: 600; border-bottom: 1px solid #99f6ec; }
+td { padding: 10px 12px; border-top: 1px solid #f1f5f4; color: #374151; vertical-align: top; line-height: 1.6; }
+tr:hover td { background: rgba(249,250,251,0.6); }
+.table-wrap { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04); margin: 12px 0; }
+code { background: #f0fdfc; color: #0f766e; padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid #ccfbf5; font-family: ui-monospace, monospace; }
+.bullet-list li { position: relative; padding-left: 4px; margin-bottom: 6px; line-height: 1.65; color: #374151; font-size: 14px; }
+.bullet-list { list-style: disc; padding-left: 20px; }
+.bullet-list li::marker { color: #2dd4bf; }
+strong { font-weight: 600; color: #111827; }
+.def-item { border-left: 4px solid #5eead4; background: rgba(240,253,252,0.4); border-radius: 0 12px 12px 0; padding: 12px 16px; margin-bottom: 12px; }
+.def-term { font-weight: 700; color: #0f766e; font-size: 14px; margin-bottom: 4px; }
+.def-exp { font-size: 14px; color: #374151; line-height: 1.65; }
+.def-ex { font-size: 12px; color: #6b7280; margin-top: 6px; font-style: italic; }
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.info-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.info-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.card-num { width: 24px; height: 24px; border-radius: 8px; background: #ccfbf5; color: #0d9488; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; }
+.card-title { font-weight: 600; color: #111827; font-size: 14px; display: flex; align-items: center; }
+.card-exp { font-size: 13px; color: #374151; line-height: 1.6; margin-top: 8px; }
+.card-ex { font-size: 11px; color: #6b7280; margin-top: 8px; padding-left: 8px; border-left: 2px solid #99f6ec; }
+.step-num { position: absolute; left: -40px; top: 0; width: 28px; height: 28px; border-radius: 50%; background: #14b8a6; color: white; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.step { position: relative; padding-left: 8px; margin-bottom: 16px; }
+.slide-num { position: absolute; top: 20px; right: 24px; font-size: 12px; color: #9ca3af; font-weight: 500; }
+</style>
+</head>
+<body class="p-8">
+<div class="max-w-4xl mx-auto space-y-6">
+
+  <!-- 헤더 -->
+  <div class="text-center mb-2">
+    <div class="inline-flex items-center gap-2 px-3 py-1 bg-brand-50 border border-brand-100 rounded-full text-xs text-brand-700 font-medium mb-3">
+      🎨 logic.summary 스킬 적용
+    </div>
+    <h1 class="text-2xl font-bold text-gray-900">산출물 미리보기</h1>
+    <p class="text-sm text-gray-500 mt-1">클로드 디자인 미러링.txt → AI 보고서</p>
+  </div>
+
+  <!-- 슬라이드 0: 타이틀 -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">1 / 9</div>
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-xl">🧠</span>
+      <h2 class="text-xl font-bold text-gray-900">클로드 디자인 100% 미러링의 비밀</h2>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-4">
+      <span class="badge bg-emerald-50 text-emerald-600">⚡ 중간 난이도</span>
+      <span class="badge bg-brand-50 text-brand-600">📚 디자인 / AI 워크플로우</span>
+      <span class="badge bg-gray-100 text-gray-600">#ClaudeAI</span>
+      <span class="badge bg-gray-100 text-gray-600">#디자인시스템</span>
+      <span class="badge bg-gray-100 text-gray-600">#미러링</span>
+      <span class="badge bg-gray-100 text-gray-600">#디자인토큰</span>
+    </div>
+    <p class="text-sm text-gray-700 leading-relaxed bg-brand-50/50 rounded-xl p-4 border border-brand-100/50">
+      클로드가 디자인을 <strong>"대충 비슷하게"</strong> 만드는 이유는 이미지 인식·구조 정보·에셋 3가지가 부족해서다. 완벽한 미러링은 <strong>"분석 단계"와 "제작 단계"를 분리</strong>하고, 8개 요소(컬러·타이포·레이아웃·간격·에셋·컴포넌트·시각효과·반응형)를 텍스트 스펙으로 명시할 때 가능해진다.
+    </p>
+    <div class="mt-5">
+      <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">핵심 포인트</h3>
+      <ul class="space-y-2">
+        <li class="flex items-start gap-3"><span class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0">1</span><span class="text-sm text-gray-700">미러링 실패는 기술 한계가 아닌 <strong>입력 정보의 부족</strong> 때문</span></li>
+        <li class="flex items-start gap-3"><span class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0">2</span><span class="text-sm text-gray-700"><strong>분석 → 제작</strong> 2단계 분리만으로 정확도 체감 2배</span></li>
+        <li class="flex items-start gap-3"><span class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0">3</span><span class="text-sm text-gray-700">우선순위: <strong>컬러 → 타이포 → 간격</strong> 3가지만 맞아도 "거의 같다"</span></li>
+        <li class="flex items-start gap-3"><span class="w-6 h-6 rounded-full bg-brand-100 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0">4</span><span class="text-sm text-gray-700">Figma Dev MCP는 이상적, <strong>텍스트 스펙 전달이 투입 대비 최고</strong></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 슬라이드 1: 미러링 실패의 3대 원인 (cards layout) -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">2 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>❌</span>
+      <h2 class="text-lg font-bold text-gray-900">왜 100% 미러링이 안 되는가? — 3대 원인</h2>
+    </div>
+    <div class="key-banner mb-4">
+      <span class="text-brand-500 text-lg">🎯</span>
+      <p class="text-sm text-brand-900 font-medium">클로드는 디자인을 "보는" 게 아니라 "추측"한다</p>
+    </div>
+    <div class="card-grid">
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">1</span>이미지 인식 한계</div>
+        <p class="card-exp">색상·폰트를 <strong>'대략적으로'</strong> 해석. #00C4CC → #4DD0E1로 임의 대체 가능</p>
+        <p class="card-ex">💡 비슷해 보이지만 브랜드 색이 완전히 틀어짐</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">2</span>구조 정보 부재</div>
+        <p class="card-exp">이미지엔 <strong>padding·margin·그리드 수치가 없음</strong>. 여백·비율을 시각적 추론에 의존</p>
+        <p class="card-ex">💡 레이아웃이 미묘하게 어긋나는 원인</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">3</span>에셋 접근 불가</div>
+        <p class="card-exp">로고 SVG·브랜드 폰트·아이콘셋에 접근 불가 → <strong>비슷한 것으로 대체</strong></p>
+        <p class="card-ex">💡 "느낌은 비슷한데 뭔가 다른" 결과의 주범</p>
+      </div>
+      <div class="info-card bg-brand-50/40 border-brand-200">
+        <div class="card-title">📌 결론</div>
+        <p class="card-exp">이미지는 <strong>렌더링된 결과물</strong>일 뿐, 디자인 시스템 정보가 아님</p>
+        <p class="card-ex">💡 AI에게 이미지 + 정확한 텍스트 스펙을 함께 줘야 함</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 2: 솔루션 비교 (table layout) -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">3 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>⚖️</span>
+      <h2 class="text-lg font-bold text-gray-900">3가지 솔루션 비교</h2>
+    </div>
+    <div class="key-banner mb-4">
+      <span class="text-brand-500 text-lg">🎯</span>
+      <p class="text-sm text-brand-900 font-medium">Remotion은 오해, Figma MCP는 이상, 텍스트 스펙은 최고의 가성비</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>방법</th><th>효과</th><th>난이도</th><th>추천도</th><th>핵심 특징</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Remotion 기술 활용</strong></td>
+            <td>🔴 낮음</td>
+            <td>높음</td>
+            <td>★☆☆☆☆</td>
+            <td>React 코드 기반 재현일 뿐, 디자인 인식 기능은 없음</td>
+          </tr>
+          <tr>
+            <td><strong>Figma Dev Mode + MCP</strong></td>
+            <td>🟢 높음</td>
+            <td>중간</td>
+            <td>★★★★☆</td>
+            <td>정확한 디자인 토큰을 코드로 추출, 전처리 필요</td>
+          </tr>
+          <tr class="bg-brand-50/30">
+            <td><strong>✅ 텍스트 스펙 직접 전달</strong></td>
+            <td>🟢 높음</td>
+            <td>낮음</td>
+            <td>★★★★★</td>
+            <td>컬러·폰트·간격을 텍스트로 명시 → 투입 대비 최고</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="bullet-list mt-4">
+      <li>⚠️ <strong>Remotion</strong>의 "디자인 인식"은 오해 — 도구 목적이 다름</li>
+      <li>💡 <strong>Figma MCP</strong>는 이상적이지만, 먼저 Figma에 디자인 올리는 전처리 필요</li>
+    </ul>
+  </div>
+
+  <!-- 슬라이드 3: 참고물 유형별 스펙 추출 (steps) -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">4 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>🔍</span>
+      <h2 class="text-lg font-bold text-gray-900">비 디자이너를 위한 스펙 추출 방법</h2>
+    </div>
+    <div class="key-banner mb-4">
+      <span class="text-brand-500 text-lg">🎯</span>
+      <p class="text-sm text-brand-900 font-medium">참고물 유형에 따라 도구만 잘 고르면 비 디자이너도 정확한 스펙을 뽑을 수 있다</p>
+    </div>
+
+    <div class="mb-5">
+      <h3 class="text-sm font-bold text-gray-800 mb-2">🌐 웹사이트가 참고물일 때 (가장 쉬움)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>도구</th><th>용도</th><th>난이도</th></tr></thead>
+          <tbody>
+            <tr><td><strong>개발자 도구 (F12)</strong></td><td>가장 정확·무료, 모든 스펙 확인</td><td>중</td></tr>
+            <tr><td><strong>CSS Peeper</strong></td><td>요소 클릭 → 색·폰트·사이즈 한눈에</td><td>하</td></tr>
+            <tr><td><strong>WhatFont</strong></td><td>폰트만 빠르게</td><td>하</td></tr>
+            <tr><td><strong>ColorZilla</strong></td><td>스포이드로 HEX 추출</td><td>하</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="mb-5">
+      <h3 class="text-sm font-bold text-gray-800 mb-2">🖼️ 이미지/PDF가 참고물일 때</h3>
+      <ul class="bullet-list">
+        <li>🎨 <strong>Figma</strong>에 이미지 드래그 → 스포이드로 색상 찍기 (무료)</li>
+        <li>🔤 <strong>WhatTheFont / Font Squirrel Matcherator</strong> — 폰트 식별</li>
+        <li>🎨 <strong>Coolors / Adobe Color</strong> — 이미지에서 팔레트 자동 추출</li>
+        <li>💧 <strong>OS 기본 스포이드</strong> — macOS Digital Color Meter, Windows PowerToys</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-bold text-gray-800 mb-2">🤖 AI 활용 — 핵심 트릭</h3>
+      <div class="def-item">
+        <div class="def-term">1단계: 분석만 시키기</div>
+        <div class="def-exp">"이 이미지에서 디자인 스펙을 분석해줘. 색상 코드, 폰트 추정, 레이아웃 구조, 간격을 최대한 정확히 뽑아줘"</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">2단계: 교정 후 제작</div>
+        <div class="def-exp">1단계 결과를 확인·수정 → "이 스펙을 기반으로 PPT를 만들어줘"로 실행</div>
+        <div class="def-ex">예: "이 색상은 #00C4CC가 아니라 #00B4D8이야" 한 번만 고치면 전체 반영</div>
+      </div>
+      <ul class="bullet-list mt-3">
+        <li>🔄 GPT-4o 등 <strong>다른 비전 모델로 크로스체크</strong>하면 색상 정확도 ↑</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 슬라이드 4: 100% 미러링을 위한 8요소 -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">5 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>📐</span>
+      <h2 class="text-lg font-bold text-gray-900">100% 미러링에 필요한 8가지 요소</h2>
+    </div>
+    <div class="key-banner mb-4">
+      <span class="text-brand-500 text-lg">🎯</span>
+      <p class="text-sm text-brand-900 font-medium">색상·폰트는 시작일 뿐, 8개 카테고리를 모두 잡아야 진짜 미러링이다</p>
+    </div>
+    <div class="card-grid">
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">1</span>🎨 컬러 시스템</div>
+        <p class="card-exp">Primary/Secondary/Accent, 배경색 <strong>계층</strong>, 텍스트 2~3단계, 그라데이션·투명도</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">2</span>🔤 타이포그래피</div>
+        <p class="card-exp">제목/본문 폰트 분리, 크기 체계, 굵기, <strong>행간·자간</strong>, 정렬·장식</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">3</span>📏 레이아웃 구조</div>
+        <p class="card-exp"><strong>12컬럼 그리드</strong>, max-width, 섹션 구분, 좌우 여백, full-bleed 패턴</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">4</span>📐 간격 체계</div>
+        <p class="card-exp"><strong>8px 단위</strong> 통일, 섹션 간(60~120px), 요소 간(16~32px), 내부 padding</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">5</span>🖼️ 디자인 에셋</div>
+        <p class="card-exp">로고(SVG), 아이콘셋(Lucide·Phosphor), 이미지 스타일, 패턴, 파비콘</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">6</span>🧩 컴포넌트 스타일</div>
+        <p class="card-exp"><strong>버튼·카드·입력·네비·푸터·구분선</strong>의 radius/shadow/padding 규칙</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">7</span>✨ 시각 효과</div>
+        <p class="card-exp">box-shadow, border-radius, opacity, <strong>blur(glassmorphism)</strong>, transition</p>
+      </div>
+      <div class="info-card">
+        <div class="card-title"><span class="card-num">8</span>📱 반응형 규칙</div>
+        <p class="card-exp">브레이크포인트(768/1024px), 레이아웃·폰트 변화, 숨겨지는 요소</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 5: 우선순위 -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">6 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>🏆</span>
+      <h2 class="text-lg font-bold text-gray-900">실전 우선순위 — 뭐부터 잡을까?</h2>
+    </div>
+    <div class="key-banner mb-4">
+      <span class="text-brand-500 text-lg">🎯</span>
+      <p class="text-sm text-brand-900 font-medium">상위 3개만 맞아도 "거의 같다" 수준은 달성한다</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>순위</th><th>요소</th><th>체감 영향</th><th>목표 수준</th></tr></thead>
+        <tbody>
+          <tr><td>🥇 1</td><td><strong>컬러 시스템</strong></td><td>★★★★★</td><td>HEX 코드 정확히 일치</td></tr>
+          <tr><td>🥈 2</td><td><strong>타이포그래피</strong></td><td>★★★★★</td><td>폰트·크기·위계 동일</td></tr>
+          <tr><td>🥉 3</td><td><strong>간격 체계</strong></td><td>★★★★☆</td><td>8px 단위 일관성</td></tr>
+          <tr><td>4</td><td>컴포넌트 스타일</td><td>★★★☆☆</td><td>radius·shadow 통일</td></tr>
+          <tr><td>5</td><td>시각 효과·에셋·반응형</td><td>★★☆☆☆</td><td>마감 단계 디테일</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="bullet-list mt-4">
+      <li>✅ <strong>1~3번</strong>이 맞으면 "거의 같아 보이는" 수준</li>
+      <li>💡 <strong>4~5번</strong>은 마감·완성도 단계에서 채우기</li>
+    </ul>
+  </div>
+
+  <!-- 슬라이드 6: 주요 용어 -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">7 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>📖</span>
+      <h2 class="text-lg font-bold text-gray-900">주요 용어</h2>
+    </div>
+    <div class="card-grid">
+      <div class="info-card bg-gray-50">
+        <p class="font-semibold text-brand-600 text-sm">디자인 토큰(Design Token)</p>
+        <p class="text-sm text-gray-600 mt-1.5">색·폰트·간격 등 디자인 결정을 코드가 읽을 수 있는 값으로 변환한 것</p>
+      </div>
+      <div class="info-card bg-gray-50">
+        <p class="font-semibold text-brand-600 text-sm">Figma Dev Mode MCP</p>
+        <p class="text-sm text-gray-600 mt-1.5">Figma에서 디자인 스펙을 AI가 직접 읽도록 해주는 연결 프로토콜</p>
+      </div>
+      <div class="info-card bg-gray-50">
+        <p class="font-semibold text-brand-600 text-sm">Glassmorphism</p>
+        <p class="text-sm text-gray-600 mt-1.5">배경 블러 + 반투명으로 유리 느낌을 내는 시각 효과</p>
+      </div>
+      <div class="info-card bg-gray-50">
+        <p class="font-semibold text-brand-600 text-sm">Full-bleed</p>
+        <p class="text-sm text-gray-600 mt-1.5">배경은 화면 전체, 콘텐츠는 중앙 제한폭으로 두는 레이아웃 패턴</p>
+      </div>
+      <div class="info-card bg-gray-50">
+        <p class="font-semibold text-brand-600 text-sm">Breakpoint</p>
+        <p class="text-sm text-gray-600 mt-1.5">모바일·태블릿·데스크톱 레이아웃이 전환되는 화면 너비 기준점</p>
+      </div>
+      <div class="info-card bg-gray-50">
+        <p class="font-semibold text-brand-600 text-sm">8pt Grid System</p>
+        <p class="text-sm text-gray-600 mt-1.5">모든 간격을 8의 배수(8·16·24·32)로 통일하는 디자인 규칙</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 7: 인사이트 -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">8 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>💡</span>
+      <h2 class="text-lg font-bold text-gray-900">핵심 인사이트 & 오해</h2>
+    </div>
+    <h3 class="text-sm font-bold text-gray-800 mb-2">🔑 Key Insights</h3>
+    <ul class="bullet-list mb-5">
+      <li><strong>분리가 곧 정확도</strong>: 분석과 제작을 분리만 해도 체감 정확도 2배 상승</li>
+      <li><strong>이미지는 추측의 영역</strong>: 아무리 좋은 AI도 이미지만으로는 100% 정확할 수 없음</li>
+      <li><strong>8px 그리드는 마법</strong>: 간격을 8 배수로만 통일해도 전체가 정돈됨</li>
+    </ul>
+
+    <h3 class="text-sm font-bold text-gray-800 mb-2">⚠️ Common Misunderstandings</h3>
+    <ul class="bullet-list mb-5">
+      <li>❌ "Remotion이 디자인 인식을 잘한다" → Remotion은 React 영상 도구일 뿐</li>
+      <li>❌ "색상·폰트만 맞으면 미러링 완료" → 간격·컴포넌트·시각효과까지 봐야 함</li>
+    </ul>
+
+    <h3 class="text-sm font-bold text-gray-800 mb-2">🛠️ Practical Applications</h3>
+    <ul class="bullet-list mb-5">
+      <li>🔄 웹사이트 참고 → CSS Peeper+ColorZilla로 5분 내 스펙 추출</li>
+      <li>🖼️ 이미지 참고 → 클로드 1차 분석 → Coolors 크로스체크 → 제작</li>
+    </ul>
+
+    <div class="key-banner">
+      <span class="text-brand-500 text-lg">🏁</span>
+      <p class="text-sm text-brand-900 font-medium">핵심 교훈: <strong>클로드에게 '보여주지' 말고 '알려줘라'</strong> — 추측할 여지를 없애면 미러링은 성공한다</p>
+    </div>
+  </div>
+
+  <!-- 슬라이드 8: 메타데이터 -->
+  <div class="slide-card p-8 relative">
+    <div class="slide-num">9 / 9</div>
+    <div class="flex items-center gap-2 mb-4">
+      <span>📑</span>
+      <h2 class="text-lg font-bold text-gray-900">Ebook Metadata</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:30%">📌 Topic</th><td>AI 디자인 미러링 정확도 향상 전략</td></tr>
+          <tr><th>📖 Chapter Title</th><td>Chapter 3. AI에게 디자인을 제대로 전달하는 법</td></tr>
+          <tr><th>⚡ Difficulty</th><td>Intermediate</td></tr>
+          <tr><th>🏷️ Keywords</th><td>design-tokens, claude-ai, figma-mcp, mirroring, css-peeper, design-system</td></tr>
+          <tr><th>⬅️ Prev Topic</th><td>AI로 슬라이드·PPT 자동 생성의 기본 원리</td></tr>
+          <tr><th>➡️ Next Topic</th><td>Figma Dev Mode MCP 실전 셋업 가이드</td></tr>
+          <tr><th>🎯 Use Case</th><td>비 디자이너 PM이 기존 브랜드 사이트를 그대로 살려 랜딩페이지/제안서를 AI로 제작할 때</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-sm font-bold text-gray-800 mt-5 mb-2">📚 복습 팁</h3>
+    <ul class="bullet-list">
+      <li>💡 다음번에 디자인을 참고할 땐 <strong>"색상 HEX 5개"</strong>만 먼저 뽑아보기</li>
+      <li>💡 클로드에 이미지 줄 때 무조건 <strong>"먼저 스펙부터 분석해줘"</strong>로 시작</li>
+      <li>💡 CSS Peeper + ColorZilla 크롬 확장 <strong>지금 바로 설치</strong>하기</li>
+    </ul>
+  </div>
+
+  <!-- JSON 원본 -->
+  <details class="slide-card p-6 mt-8">
+    <summary class="cursor-pointer text-sm font-bold text-gray-700">📦 JSON 산출물 원본 (AI가 실제로 반환한 구조)</summary>
+    <pre class="mt-4 text-xs bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto leading-relaxed" id="json-output"></pre>
+  </details>
+</div>
+
+<script>
+const jsonOutput = {
+  title: "클로드 디자인 100% 미러링의 비밀",
+  subject: "디자인 / AI 워크플로우",
+  difficulty: "medium",
+  summary: "클로드가 디자인을 \"대충 비슷하게\" 만드는 이유는 이미지 인식·구조 정보·에셋 3가지가 부족해서다. 완벽한 미러링은 '분석 단계'와 '제작 단계'를 분리하고, 8개 요소(컬러·타이포·레이아웃·간격·에셋·컴포넌트·시각효과·반응형)를 텍스트 스펙으로 명시할 때 가능해진다.",
+  key_points: [
+    "미러링 실패는 기술 한계가 아닌 입력 정보의 부족 때문",
+    "분석 → 제작 2단계 분리만으로 정확도 체감 2배",
+    "우선순위: 컬러 → 타이포 → 간격 3가지만 맞아도 '거의 같다'",
+    "Figma Dev MCP는 이상적, 텍스트 스펙 전달이 투입 대비 최고"
+  ],
+  sections: [
+    {
+      title: "미러링 실패의 3대 원인",
+      type: "concept",
+      layout: "cards",
+      key_message: "클로드는 디자인을 '보는' 게 아니라 '추측'한다",
+      content: "",
+      points: [
+        { term: "이미지 인식 한계", explanation: "색상·폰트를 '대략적으로' 해석. #00C4CC → #4DD0E1로 임의 대체 가능", example: "비슷해 보이지만 브랜드 색이 완전히 틀어짐" },
+        { term: "구조 정보 부재", explanation: "이미지엔 padding·margin·그리드 수치가 없음. 여백·비율을 시각적 추론에 의존", example: "레이아웃이 미묘하게 어긋나는 원인" },
+        { term: "에셋 접근 불가", explanation: "로고 SVG·브랜드 폰트·아이콘셋에 접근 불가 → 비슷한 것으로 대체", example: "'느낌은 비슷한데 뭔가 다른' 결과의 주범" }
+      ]
+    },
+    {
+      title: "3가지 솔루션 비교",
+      type: "comparison",
+      layout: "table",
+      key_message: "Remotion은 오해, Figma MCP는 이상, 텍스트 스펙은 최고의 가성비",
+      content: "| 방법 | 효과 | 난이도 | 추천도 | 핵심 특징 |\n|---|---|---|---|---|\n| **Remotion 기술 활용** | 🔴 낮음 | 높음 | ★☆☆☆☆ | React 코드 기반 재현일 뿐 |\n| **Figma Dev Mode + MCP** | 🟢 높음 | 중간 | ★★★★☆ | 정확한 디자인 토큰 추출 |\n| **✅ 텍스트 스펙 직접 전달** | 🟢 높음 | 낮음 | ★★★★★ | 투입 대비 최고 |"
+    },
+    {
+      title: "100% 미러링을 위한 8가지 요소",
+      type: "concept",
+      layout: "cards",
+      key_message: "색상·폰트는 시작일 뿐, 8개 카테고리를 모두 잡아야 진짜 미러링이다",
+      content: "",
+      points: [
+        { term: "🎨 컬러 시스템", explanation: "Primary/Secondary/Accent, 배경색 계층, 텍스트 2~3단계, 그라데이션·투명도" },
+        { term: "🔤 타이포그래피", explanation: "제목/본문 폰트 분리, 크기 체계, 굵기, 행간·자간, 정렬·장식" },
+        { term: "📏 레이아웃 구조", explanation: "12컬럼 그리드, max-width, 섹션 구분, 좌우 여백, full-bleed 패턴" },
+        { term: "📐 간격 체계", explanation: "8px 단위 통일, 섹션 간(60~120px), 요소 간(16~32px)" },
+        { term: "🖼️ 디자인 에셋", explanation: "로고(SVG), 아이콘셋, 이미지 스타일, 패턴, 파비콘" },
+        { term: "🧩 컴포넌트 스타일", explanation: "버튼·카드·입력·네비·푸터의 radius/shadow/padding 규칙" },
+        { term: "✨ 시각 효과", explanation: "box-shadow, border-radius, opacity, blur, transition" },
+        { term: "📱 반응형 규칙", explanation: "브레이크포인트(768/1024px), 레이아웃·폰트 변화" }
+      ]
+    }
+  ],
+  vocabulary: [
+    { term: "디자인 토큰(Design Token)", definition: "색·폰트·간격 등 디자인 결정을 코드가 읽을 수 있는 값으로 변환한 것" },
+    { term: "Figma Dev Mode MCP", definition: "Figma에서 디자인 스펙을 AI가 직접 읽도록 해주는 연결 프로토콜" },
+    { term: "Glassmorphism", definition: "배경 블러 + 반투명으로 유리 느낌을 내는 시각 효과" },
+    { term: "Full-bleed", definition: "배경은 화면 전체, 콘텐츠는 중앙 제한폭으로 두는 레이아웃 패턴" },
+    { term: "8pt Grid System", definition: "모든 간격을 8의 배수로 통일하는 디자인 규칙" }
+  ],
+  insights: {
+    key_insights: [
+      "분리가 곧 정확도: 분석과 제작을 분리만 해도 체감 정확도 2배 상승",
+      "이미지는 추측의 영역: 아무리 좋은 AI도 이미지만으로는 100% 정확할 수 없음",
+      "8px 그리드는 마법: 간격을 8 배수로만 통일해도 전체가 정돈됨"
+    ],
+    misunderstandings: [
+      "Remotion이 디자인 인식을 잘한다 → Remotion은 React 영상 도구일 뿐",
+      "색상·폰트만 맞으면 미러링 완료 → 간격·컴포넌트·시각효과까지 봐야 함"
+    ],
+    applications: [
+      "웹사이트 참고 → CSS Peeper+ColorZilla로 5분 내 스펙 추출",
+      "이미지 참고 → 클로드 1차 분석 → Coolors 크로스체크 → 제작"
+    ],
+    takeaway: "클로드에게 '보여주지' 말고 '알려줘라' — 추측할 여지를 없애면 미러링은 성공한다"
+  },
+  study_tips: [
+    "다음번에 디자인을 참고할 땐 '색상 HEX 5개'만 먼저 뽑아보기",
+    "클로드에 이미지 줄 때 무조건 '먼저 스펙부터 분석해줘'로 시작",
+    "CSS Peeper + ColorZilla 크롬 확장 지금 바로 설치하기"
+  ],
+  tags: ["ClaudeAI", "디자인시스템", "미러링", "디자인토큰", "FigmaMCP"],
+  metadata: {
+    chapter_title: "Chapter 3. AI에게 디자인을 제대로 전달하는 법",
+    keywords: ["design-tokens", "claude-ai", "figma-mcp", "mirroring", "css-peeper", "design-system"],
+    prev_topic: "AI로 슬라이드·PPT 자동 생성의 기본 원리",
+    next_topic: "Figma Dev Mode MCP 실전 셋업 가이드",
+    use_case: "비 디자이너 PM이 기존 브랜드 사이트를 그대로 살려 랜딩페이지/제안서를 AI로 제작할 때"
+  }
+};
+document.getElementById('json-output').textContent = JSON.stringify(jsonOutput, null, 2);
+</script>
+</body>
+</html>

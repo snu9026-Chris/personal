@@ -1,0 +1,13 @@
+"use client";
+import { createBrowserClient } from "@supabase/ssr";
+
+// 브라우저(클라이언트 컴포넌트) 전용 Supabase 클라이언트.
+// publishable(anon) 키만 사용하며, 로그인/세션 관리에만 쓴다.
+// 데이터 조회/변경은 절대 이 클라이언트로 하지 말고 `/api/*` 라우트를 경유할 것.
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}

@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-500 text-white font-medium
+           hover:bg-brand-600 active:bg-brand-700 transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200
+           bg-white text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white font-medium
+           hover:bg-red-600 transition-all duration-150 shadow-sm;
+  }
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+  }
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white
+           focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+           placeholder:text-gray-400 text-gray-900 transition-all;
+  }
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  }
+  .section-title {
+    @apply text-lg font-semibold text-gray-800 flex items-center gap-2;
+  }
+}
+
+/* 프린트 스타일 (PDF 다운로드용) */
+@media print {
+  /* 페이지 여백 */
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  /* 화면 전용 요소 숨김 */
+  .no-print,
+  nav,
+  header[role="banner"],
+  aside {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* 배경 색상/이미지 인쇄 강제 (Tailwind의 brand 배경 등 보존) */
+  html, body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 라이브러리 화면에서 우측 패널만 인쇄되도록 폭 강제 */
+  .min-h-\[calc\(100vh-4rem\)\] {
+    min-height: 0 !important;
+  }
+
+  /* 슬라이드(card) 단위 page break */
+  #report-content > .card {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
+    margin: 0 0 8mm 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto;
+  }
+
+  /* 마지막 슬라이드 뒤 빈 페이지 방지 */
+  #report-content > .card:last-child {
+    page-break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* 카드 내부 줄바꿈 방지 (표/카드/리스트) */
+  table, dl, .grid > div, ul > li, ol > li {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 이미지/긴 텍스트가 카드 바깥으로 새지 않도록 */
+  #report-content img,
+  #report-content pre,
+  #report-content table {
+    max-width: 100% !important;
+  }
+
+  /* GFM 표가 인쇄에서 깨지지 않도록 */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+  th, td {
+    border: 1px solid #d1d5db !important;
+    padding: 6px 10px !important;
+    font-size: 11pt !important;
+  }
+  thead {
+    background: #f3f4f6 !important;
+  }
+
+  /* 본문 폰트/색상 안정화 */
+  body, p, li, dd, dt, td, th {
+    color: #111827 !important;
+    font-size: 11pt !important;
+    line-height: 1.55 !important;
+  }
+  h1 { font-size: 20pt !important; }
+  h2 { font-size: 15pt !important; }
+  h3 { font-size: 12pt !important; }
+}
+
+/* 스크롤바 커스텀 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 드래그앤드롭 활성화 효과 */
+.drop-active {
+  @apply border-brand-400 bg-brand-50;
+}
+
+/* 에디터 스타일 */
+.report-editor [contenteditable] {
+  outline: none;
+}
+.report-editor [contenteditable]:focus {
+  @apply bg-brand-50 rounded-lg px-2;
+}
