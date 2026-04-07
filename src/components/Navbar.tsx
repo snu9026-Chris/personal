@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BookOpen, Target, Home, Brain, FolderOpen, Terminal } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { BookOpen, Target, Home, Brain, FolderOpen, Terminal, LogIn, LogOut, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase-browser";
 
 const navItems = [
   { href: "/",         label: "홈",           icon: Home },
@@ -15,6 +17,59 @@ const navItems = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [authState, setAuthState] = useState<"loading" | "in" | "out">("loading");
+  const [email, setEmail] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      if (data.user) {
+        setAuthState("in");
+        setEmail(data.user.email ?? null);
+      } else {
+        setAuthState("out");
+      }
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        setAuthState("in");
+        setEmail(session.user.email ?? null);
+      } else {
+        setAuthState("out");
+        setEmail(null);
+      }
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function signInWithGoogle() {
+    setBusy(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (error) {
+      setBusy(false);
+      alert(`로그인 실패: ${error.message}`);
+    }
+  }
+
+  async function signOut() {
+    setBusy(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setBusy(false);
+    router.refresh();
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm">
@@ -52,6 +107,37 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* 인증 상태 */}
+            <div className="ml-2 pl-2 border-l border-gray-200 flex items-center gap-2">
+              {authState === "loading" ? (
+                <Loader2 size={16} className="animate-spin text-gray-400" />
+              ) : authState === "in" ? (
+                <>
+                  <span className="hidden md:block text-xs text-gray-500 max-w-[160px] truncate" title={email ?? ""}>
+                    {email}
+                  </span>
+                  <button
+                    onClick={signOut}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 transition-colors"
+                    title="로그아웃"
+                  >
+                    <LogOut size={16} />
+                    <span className="hidden sm:block">로그아웃</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={signInWithGoogle}
+                  disabled={busy}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                  <span className="hidden sm:block">Google 로그인</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
