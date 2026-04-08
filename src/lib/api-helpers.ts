@@ -8,8 +8,16 @@ const ALLOWED_EMAILS = new Set(["snu9026@gmail.com"]);
  * API 라우트에서 호출 — 현재 요청의 Supabase 세션을 검증한다.
  * 인증되지 않았거나 화이트리스트에 없는 이메일이면 UnauthorizedError를 throw한다.
  * try/catch + handleApiError 안에서 호출할 것.
+ *
+ * 로컬 dev (NODE_ENV !== "production")에서는 인증을 우회한다 (검증 편의).
+ * Vercel 빌드는 NODE_ENV가 자동으로 "production"이라 production은 영향 없음.
  */
 export async function requireUser() {
+  // ── 로컬 dev 우회 ──
+  if (process.env.NODE_ENV !== "production") {
+    return { id: "local-dev", email: "snu9026@gmail.com" } as { id: string; email: string };
+  }
+
   const supabase = await createRouteClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
