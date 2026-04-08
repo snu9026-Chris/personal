@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, UnauthorizedError } from "@/lib/api-helpers";
 import { LOGIC_SUMMARY_PROMPT } from "@/lib/logic-summary-skill";
+import { supabase } from "@/lib/supabase-server";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -9,6 +10,35 @@ function getClient() {
     throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
   }
   return new Anthropic({ apiKey });
+}
+
+// ── DB에서 logic.summary prompt fetch + 5분 in-memory 캐시 ──
+// 사용자가 sync-skills로 로컬 SKILL.md를 DB에 동기화하면 재배포 없이 즉시 반영됨
+type CacheEntry = { prompt: string; expiresAt: number };
+let promptCache: CacheEntry | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+
+async function getLogicSummaryPrompt(): Promise<string> {
+  // 1) 캐시 hit
+  if (promptCache && promptCache.expiresAt > Date.now()) {
+    return promptCache.prompt;
+  }
+  // 2) DB 조회
+  try {
+    const { data, error } = await supabase
+      .from("skills")
+      .select("prompt")
+      .eq("name", "logic.summary")
+      .single();
+    if (!error && data?.prompt) {
+      promptCache = { prompt: data.prompt, expiresAt: Date.now() + CACHE_TTL_MS };
+      return data.prompt;
+    }
+  } catch (e) {
+    console.warn("logic.summary prompt DB fetch 실패, fallback 사용:", e);
+  }
+  // 3) Fallback: 인라인된 상수
+  return LOGIC_SUMMARY_PROMPT;
 }
 
 export async function POST(request: NextRequest) {
@@ -29,8 +59,8 @@ export async function POST(request: NextRequest) {
       ? text.slice(0, MAX_TEXT_LENGTH) + "\n\n...(이하 생략: 원문이 너무 길어 앞부분만 분석)"
       : text;
 
-    // logic.summary 스킬 (인라인된 모듈)을 system prompt로 사용
-    const systemPrompt = LOGIC_SUMMARY_PROMPT;
+    // logic.summary 스킬 system prompt — DB → 캐시 → fallback 순으로 결정
+    const systemPrompt = await getLogicSummaryPrompt();
 
     const message = await getClient().messages.create({
       model: "claude-sonnet-4-6",

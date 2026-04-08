@@ -6,7 +6,9 @@
     "dev": "node scripts/check-port.mjs && next dev -p 3030",
     "build": "next build",
     "start": "node scripts/check-port.mjs && next start -p 3030",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync-skills": "node scripts/sync-skills.mjs",
+    "sync-skills:dry": "node scripts/sync-skills.mjs --dry"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
