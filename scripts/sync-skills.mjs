@@ -30,6 +30,30 @@ const args = process.argv.slice(2);
 const DRY = args.includes("--dry");
 const QUIET = args.includes("--quiet");
 
+// ─── Anthropic 기본 제공 스킬 (sync에서 제외) ───
+// 사용자가 직접 만든 스킬만 홈페이지 /skills 페이지에 표시되도록 필터링.
+// 새 사용자 스킬은 자동 포함되고, 여기 등록된 이름만 제외됨.
+// 만약 이 중 하나를 사용자가 customize해서 sync하고 싶으면 해당 줄 주석 처리하면 됨.
+const ANTHROPIC_BUILTIN_SKILLS = new Set([
+  "algorithmic-art",
+  "brand-guidelines",
+  "canvas-design",
+  "claude-api",
+  "doc-coauthoring",
+  "docx",
+  "frontend-design",
+  "internal-comms",
+  "mcp-builder",
+  "pdf",
+  "pptx",
+  "skill-creator",
+  "slack-gif-creator",
+  "theme-factory",
+  "web-artifacts-builder",
+  "webapp-testing",
+  "xlsx",
+]);
+
 function log(...m) { if (!QUIET) console.log(...m); }
 function logErr(...m) { console.error(...m); }
 
@@ -127,6 +151,8 @@ function collectFormalSkills() {
       const raw = readFileSync(skillPath, "utf-8");
       const { meta, body } = parseFrontmatter(raw);
       const name = (meta.name || dir).toString().trim();
+      // Anthropic 기본 스킬은 제외
+      if (ANTHROPIC_BUILTIN_SKILLS.has(name) || ANTHROPIC_BUILTIN_SKILLS.has(dir)) continue;
       out.push({
         name,
         description: (meta.description || "").toString().slice(0, 500),
