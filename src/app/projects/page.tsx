@@ -73,16 +73,41 @@ export default function ProjectsPage() {
 
   const selectedProject = projects.find((p) => p.id === selectedId);
 
-  // ── 프로젝트 목록 불러오기 ──
-  // 모바일 UX 위해 자동 선택하지 않음 — 사용자가 직접 클릭해야 timeline으로 진입
+  // ── 프로젝트 목록 불러오기 (최신 활동순 정렬) ──
   const fetchProjects = useCallback(async () => {
-    const res = await fetch("/api/projects");
-    const { projects: data } = await res.json();
-    setProjects(data ?? []);
+    const [projRes, logsRes] = await Promise.all([
+      fetch("/api/projects"),
+      fetch("/api/project-logs"),
+    ]);
+    const { projects: pData } = await projRes.json();
+    const { logs: lData } = await logsRes.json();
+    const allProjects: Project[] = pData ?? [];
+    const allLogs: { project_id: string; logged_at: string }[] = lData ?? [];
+
+    // 각 프로젝트의 최신 활동 시각 (log가 없으면 created_at)
+    const activityMs = (p: Project) => {
+      const latest = allLogs.find((l) => l.project_id === p.id);
+      return new Date(latest?.logged_at ?? p.created_at ?? 0).getTime();
+    };
+    const sorted = [...allProjects].sort((a, b) => activityMs(b) - activityMs(a));
+    setProjects(sorted);
     setLoadingProjects(false);
   }, []);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
+
+  // ── 데스크톱에서 진입 시 가장 최근 프로젝트 자동 선택 ──
+  // 모바일은 사이드바가 풀스크린이라 자동 선택하면 timeline으로 강제 이동되므로 제외
+  useEffect(() => {
+    if (
+      projects.length > 0 &&
+      !selectedId &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 768px)").matches
+    ) {
+      setSelectedId(projects[0].id);
+    }
+  }, [projects, selectedId]);
 
   // ── 로그 불러오기 ──
   const fetchLogs = useCallback(async (projectId: string) => {
