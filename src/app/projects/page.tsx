@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   FolderOpen, Plus, ChevronRight, Clock, Tag, CheckCircle2,
-  AlertCircle, Circle, Loader2, Trash2, X, Save, ChevronDown, ArrowLeft
+  AlertCircle, Circle, Loader2, Trash2, X, Save, ArrowLeft, Pencil
 } from "lucide-react";
 import MarkdownContent from "@/components/MarkdownContent";
 
@@ -69,7 +69,7 @@ export default function ProjectsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
-  const [showNewLog, setShowNewLog] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const selectedProject = projects.find((p) => p.id === selectedId);
 
@@ -108,17 +108,30 @@ export default function ProjectsPage() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [fetchProjects, fetchLogs, selectedId]);
 
-  // ── 프로젝트 추가 ──
-  const handleAddProject = async (name: string, description: string, color: string) => {
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, color }),
-    });
-    const { project } = await res.json();
-    setProjects((prev) => [project, ...prev]);
-    setSelectedId(project.id);
-    setShowNewProject(false);
+  // ── 프로젝트 저장 (생성 또는 수정) ──
+  const handleSaveProject = async (name: string, description: string, color: string) => {
+    if (editingProject) {
+      // 수정: PUT
+      const res = await fetch("/api/projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingProject.id, name, description, color }),
+      });
+      const { project } = await res.json();
+      setProjects((prev) => prev.map((p) => (p.id === project.id ? project : p)));
+      setEditingProject(null);
+    } else {
+      // 생성: POST
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description, color }),
+      });
+      const { project } = await res.json();
+      setProjects((prev) => [project, ...prev]);
+      setSelectedId(project.id);
+      setShowNewProject(false);
+    }
   };
 
   // ── 프로젝트 삭제 ──
@@ -127,19 +140,6 @@ export default function ProjectsPage() {
     await fetch(`/api/projects?id=${id}`, { method: "DELETE" });
     setProjects((prev) => prev.filter((p) => p.id !== id));
     if (selectedId === id) setSelectedId(projects.find((p) => p.id !== id)?.id ?? null);
-  };
-
-  // ── 로그 추가 ──
-  const handleAddLog = async (title: string, content: string, status: string, tags: string[]) => {
-    if (!selectedId) return;
-    const res = await fetch("/api/project-logs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: selectedId, title, content, status, tags }),
-    });
-    const { log } = await res.json();
-    setLogs((prev) => [log, ...prev]);
-    setShowNewLog(false);
   };
 
   // ── 로그 삭제 ──
@@ -213,9 +213,18 @@ export default function ProjectsPage() {
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
+                    onClick={(e) => { e.stopPropagation(); setEditingProject(p); }}
+                    className="w-6 h-6 rounded-md hover:bg-brand-50 text-gray-400 hover:text-brand-500
+                               flex items-center justify-center transition-colors"
+                    title="이름/색상 편집"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id); }}
                     className="w-6 h-6 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-500
                                flex items-center justify-center transition-colors"
+                    title="삭제"
                   >
                     <Trash2 size={12} />
                   </button>
@@ -250,13 +259,6 @@ export default function ProjectsPage() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowNewLog(true)}
-                  className="btn-primary"
-                >
-                  <Plus size={16} />
-                  로그 추가
-                </button>
               </div>
             </div>
 
@@ -272,13 +274,9 @@ export default function ProjectsPage() {
                     <Clock size={28} className="text-gray-300" />
                   </div>
                   <p className="text-gray-400 font-medium">아직 로그가 없습니다</p>
-                  <p className="text-gray-300 text-sm mt-1">작업 내용을 기록해보세요</p>
-                  <button
-                    onClick={() => setShowNewLog(true)}
-                    className="btn-primary mt-4"
-                  >
-                    <Plus size={16} /> 첫 로그 추가
-                  </button>
+                  <p className="text-gray-300 text-sm mt-1">
+                    Claude Code에서 <code className="px-1.5 py-0.5 bg-gray-100 rounded text-brand-600 font-mono text-xs">update.recent</code> 트리거 시 자동 기록됩니다
+                  </p>
                 </div>
               ) : (
                 <div className="max-w-3xl mx-auto space-y-8">
@@ -365,21 +363,15 @@ export default function ProjectsPage() {
         )}
       </main>
 
-      {/* ────── 새 프로젝트 모달 ────── */}
-      {showNewProject && (
-        <NewProjectModal
-          onSave={handleAddProject}
-          onClose={() => setShowNewProject(false)}
-        />
-      )}
-
-      {/* ────── 새 로그 모달 ────── */}
-      {showNewLog && selectedProject && (
-        <NewLogModal
-          projectName={selectedProject.name}
-          projectColor={selectedProject.color}
-          onSave={handleAddLog}
-          onClose={() => setShowNewLog(false)}
+      {/* ────── 프로젝트 생성/편집 모달 (공용) ────── */}
+      {(showNewProject || editingProject) && (
+        <ProjectFormModal
+          initial={editingProject}
+          onSave={handleSaveProject}
+          onClose={() => {
+            setShowNewProject(false);
+            setEditingProject(null);
+          }}
         />
       )}
     </div>
@@ -387,20 +379,25 @@ export default function ProjectsPage() {
 }
 
 // ──────────────────────────────────────────
-// 새 프로젝트 모달
+// 프로젝트 생성/편집 모달 (공용)
 // ──────────────────────────────────────────
-function NewProjectModal({
-  onSave, onClose,
-}: { onSave: (name: string, desc: string, color: string) => void; onClose: () => void }) {
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [color, setColor] = useState(PROJECT_COLORS[0]);
+function ProjectFormModal({
+  initial, onSave, onClose,
+}: {
+  initial: Project | null;
+  onSave: (name: string, desc: string, color: string) => void;
+  onClose: () => void;
+}) {
+  const isEdit = !!initial;
+  const [name, setName] = useState(initial?.name ?? "");
+  const [desc, setDesc] = useState(initial?.description ?? "");
+  const [color, setColor] = useState(initial?.color ?? PROJECT_COLORS[0]);
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-up">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900">새 프로젝트</h2>
+          <h2 className="font-bold text-gray-900">{isEdit ? "프로젝트 편집" : "새 프로젝트"}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
             <X size={16} />
           </button>
@@ -446,115 +443,7 @@ function NewProjectModal({
             disabled={!name.trim()}
             className="btn-primary flex-1 justify-center"
           >
-            <Save size={15} /> 만들기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────
-// 새 로그 모달
-// ──────────────────────────────────────────
-function NewLogModal({
-  projectName, projectColor, onSave, onClose,
-}: { projectName: string; projectColor: string; onSave: (title: string, content: string, status: string, tags: string[]) => void; onClose: () => void }) {
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [status, setStatus] = useState("in_progress");
-  const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-
-  const addTag = () => {
-    const t = tagInput.trim();
-    if (t && !tags.includes(t)) { setTags([...tags, t]); setTagInput(""); }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-up">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: projectColor }} />
-            <h2 className="font-bold text-gray-900">로그 추가 — {projectName}</h2>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">제목 *</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: Google Drive 연동 완료"
-              className="input-field"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">내용</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="작업 내용, 결과, 다음 할 일 등 자유롭게..."
-              className="input-field min-h-[120px] resize-none text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">상태</label>
-            <div className="flex gap-2">
-              {(["in_progress", "completed", "blocked"] as const).map((s) => {
-                const sc = STATUS_CONFIG[s];
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setStatus(s)}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-medium border transition-all
-                      ${status === s ? sc.bg + " border-current" : "border-gray-100 text-gray-500 hover:bg-gray-50"}`}
-                  >
-                    {sc.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">태그</label>
-            <div className="flex gap-2">
-              <input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addTag()}
-                placeholder="태그 입력 후 Enter"
-                className="input-field flex-1 text-sm"
-              />
-              <button onClick={addTag} className="btn-secondary px-3">추가</button>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex gap-1.5 flex-wrap mt-2">
-                {tags.map((t) => (
-                  <span key={t} className="badge bg-gray-100 text-gray-600 text-xs gap-1">
-                    {t}
-                    <button onClick={() => setTags(tags.filter((x) => x !== t))}>
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2 p-5 border-t border-gray-100">
-          <button onClick={onClose} className="btn-secondary flex-1 justify-center">취소</button>
-          <button
-            onClick={() => { if (title.trim()) onSave(title.trim(), content.trim(), status, tags); }}
-            disabled={!title.trim()}
-            className="btn-primary flex-1 justify-center"
-          >
-            <Save size={15} /> 로그 저장
+            <Save size={15} /> {isEdit ? "저장" : "만들기"}
           </button>
         </div>
       </div>
