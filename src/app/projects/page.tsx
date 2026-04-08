@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   FolderOpen, Plus, ChevronRight, Clock, Tag, CheckCircle2,
-  AlertCircle, Circle, Loader2, Trash2, X, Save, ChevronDown
+  AlertCircle, Circle, Loader2, Trash2, X, Save, ChevronDown, ArrowLeft
 } from "lucide-react";
 import MarkdownContent from "@/components/MarkdownContent";
 
@@ -74,13 +74,13 @@ export default function ProjectsPage() {
   const selectedProject = projects.find((p) => p.id === selectedId);
 
   // ── 프로젝트 목록 불러오기 ──
+  // 모바일 UX 위해 자동 선택하지 않음 — 사용자가 직접 클릭해야 timeline으로 진입
   const fetchProjects = useCallback(async () => {
     const res = await fetch("/api/projects");
     const { projects: data } = await res.json();
     setProjects(data ?? []);
-    if (data?.length > 0 && !selectedId) setSelectedId(data[0].id);
     setLoadingProjects(false);
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
@@ -152,10 +152,10 @@ export default function ProjectsPage() {
 
   // ──────────────────────────────────────────
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 flex">
+    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 flex flex-col md:flex-row">
 
-      {/* ────── 왼쪽: 프로젝트 목록 ────── */}
-      <aside className="w-72 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
+      {/* ────── 왼쪽: 프로젝트 목록 (모바일에선 선택 시 숨김) ────── */}
+      <aside className={`${selectedProject ? "hidden md:flex" : "flex"} w-full md:w-72 md:flex-shrink-0 bg-white border-r border-gray-100 flex-col`}>
         {/* 헤더 */}
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between mb-1">
@@ -227,19 +227,26 @@ export default function ProjectsPage() {
         </div>
       </aside>
 
-      {/* ────── 오른쪽: 타임라인 ────── */}
-      <main className="flex-1 flex flex-col min-w-0">
+      {/* ────── 오른쪽: 타임라인 (모바일에선 선택 안 했을 때 숨김) ────── */}
+      <main className={`${selectedProject ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
         {selectedProject ? (
           <>
             {/* 프로젝트 헤더 */}
-            <div className="bg-white border-b border-gray-100 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: selectedProject.color }} />
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900">{selectedProject.name}</h1>
+            <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    onClick={() => setSelectedId(null)}
+                    className="md:hidden flex-shrink-0 w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500"
+                    title="목록으로"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: selectedProject.color }} />
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-bold text-gray-900 truncate">{selectedProject.name}</h1>
                     {selectedProject.description && (
-                      <p className="text-sm text-gray-500 mt-0.5">{selectedProject.description}</p>
+                      <p className="text-sm text-gray-500 mt-0.5 truncate">{selectedProject.description}</p>
                     )}
                   </div>
                 </div>
@@ -254,7 +261,7 @@ export default function ProjectsPage() {
             </div>
 
             {/* 타임라인 */}
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
               {loadingLogs ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 size={24} className="animate-spin text-gray-300" />

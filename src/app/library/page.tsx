@@ -9,6 +9,7 @@ import {
 import { Report } from "@/lib/supabase";
 import { DIFFICULTY_CONFIG } from "@/lib/constants";
 import ReportPreview from "@/components/ReportPreview";
+import { exportReportPdf } from "@/lib/pdf";
 
 // ──────────────────────────────────────────
 export default function LibraryPage() {
@@ -54,10 +55,18 @@ export default function LibraryPage() {
     }
   };
 
-  const handlePdf = (id: string) => {
-    setSelectedId(id);
-    // 우측 패널이 마운트된 후 인쇄 (이미지/마크다운 렌더링 시간 확보)
-    setTimeout(() => window.print(), 400);
+  const handlePdf = async (report: Report) => {
+    if (!report.id) return;
+    // 우측 패널 마운트 → DOM 렌더 → PDF 캡처
+    setSelectedId(report.id);
+    // 다음 paint cycle까지 대기 (마크다운/이미지 렌더 시간 확보)
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      await exportReportPdf("report-content", report.title);
+    } catch (e) {
+      console.error(e);
+      alert("PDF 다운로드 실패. 다시 시도해주세요.");
+    }
   };
 
   // ── 재생성: 저장된 원본으로 AI 보고서 다시 생성 ──
@@ -142,13 +151,13 @@ export default function LibraryPage() {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 py-6">
-        <div className="flex gap-5 items-start">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
           {/* ────── 좌측: 카드 리스트 (sticky) ────── */}
           <div
-            className={`no-print space-y-5 transition-all ${
+            className={`no-print space-y-5 transition-all w-full ${
               selectedReport
-                ? "w-[420px] flex-shrink-0 sticky top-4 self-start max-h-[calc(100vh-6rem)] overflow-y-auto pr-1"
-                : "flex-1"
+                ? "hidden lg:block lg:w-[420px] lg:flex-shrink-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1"
+                : "lg:flex-1"
             }`}
           >
             {/* 검색 & 필터 */}
@@ -227,7 +236,7 @@ export default function LibraryPage() {
                     isRegenerating={regeneratingId === report.id}
                     onSelect={() => setSelectedId(report.id ?? null)}
                     onDelete={() => handleDelete(report.id!)}
-                    onPdf={() => handlePdf(report.id!)}
+                    onPdf={() => handlePdf(report)}
                     onRegenerate={() => handleRegenerate(report)}
                   />
                 ))}
@@ -237,7 +246,7 @@ export default function LibraryPage() {
 
           {/* ────── 우측: 풀 미리보기 패널 ────── */}
           {selectedReport && (
-            <div className="flex-1 min-w-0 print:w-full">
+            <div className="w-full lg:flex-1 min-w-0 print:w-full">
               <div className="no-print sticky top-4 z-10 mb-3 flex items-center justify-between gap-3 bg-white card px-4 py-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <BookOpen size={16} className="text-brand-500 flex-shrink-0" />
@@ -248,15 +257,15 @@ export default function LibraryPage() {
                 <button
                   onClick={() => setSelectedId(null)}
                   className="btn-secondary text-xs py-1.5 px-2.5"
-                  title="닫기"
+                  title="목록으로"
                 >
                   <X size={14} />
+                  <span className="lg:hidden ml-1">목록</span>
                 </button>
               </div>
 
               <ReportPreview
                 report={selectedReport}
-                onPdfDownload={() => handlePdf(selectedReport.id!)}
                 showActions={true}
               />
             </div>

@@ -240,7 +240,7 @@ export default function StudyPage() {
     }
   };
 
-  const handlePdfDownload = () => { if (report) window.print(); };
+  // PDF는 ReportPreview 내장 함수 사용 (onPdfDownload 미전달)
 
   const toggleSection = (idx: number) => {
     setExpandedSections((prev) => {
@@ -478,7 +478,6 @@ export default function StudyPage() {
             <ReportPreview
               report={report}
               onSave={handleSave}
-              onPdfDownload={handlePdfDownload}
               isSaving={isSaving}
               savedId={savedId}
             />

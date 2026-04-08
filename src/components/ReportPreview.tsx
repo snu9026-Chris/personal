@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Brain, Lightbulb, GraduationCap, Edit3, BookOpen, Tag, Sparkles,
   Download, Save, CheckCircle, Loader2,
@@ -7,6 +8,7 @@ import {
 import { Report, ReportSection } from "@/lib/supabase";
 import { DIFFICULTY_CONFIG, type DifficultyType } from "@/lib/constants";
 import MarkdownContent from "@/components/MarkdownContent";
+import { exportReportPdf } from "@/lib/pdf";
 
 // ──────────────────────────────────────────
 // 섹션 타입별 아이콘
@@ -205,6 +207,24 @@ export default function ReportPreview({
 }: ReportPreviewProps) {
   const slides = buildSlides(report);
   const totalSlides = slides.length;
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  // PDF 다운로드 — onPdfDownload prop이 있으면 그걸 호출 (호환), 없으면 내장 함수 사용
+  async function handlePdf() {
+    if (onPdfDownload) {
+      onPdfDownload();
+      return;
+    }
+    setPdfBusy(true);
+    try {
+      await exportReportPdf("report-content", report.title || "report");
+    } catch (e) {
+      console.error("PDF export failed:", e);
+      alert("PDF 다운로드 실패. 다시 시도해주세요.");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -227,11 +247,10 @@ export default function ReportPreview({
             </div>
           </div>
           <div className="flex gap-2">
-            {onPdfDownload && (
-              <button onClick={onPdfDownload} className="btn-secondary text-sm py-2">
-                <Download size={15} />PDF
-              </button>
-            )}
+            <button onClick={handlePdf} disabled={pdfBusy} className="btn-secondary text-sm py-2 disabled:opacity-50">
+              {pdfBusy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              PDF
+            </button>
             {onSave && (
               <button onClick={onSave} disabled={isSaving || !!savedId} className="btn-primary text-sm py-2">
                 {isSaving ? <><Loader2 size={15} className="animate-spin" />저장 중...</>
