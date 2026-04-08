@@ -209,7 +209,8 @@ export default function StudyPage() {
         throw new Error(err.error ?? "AI 분석 실패");
       }
       const { report: generatedReport } = await sumRes.json();
-      setReport(generatedReport);
+      // 재생성을 위해 원본 텍스트를 함께 보관
+      setReport({ ...generatedReport, original_content: text });
       setExpandedSections(new Set([0]));
       setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (e) {

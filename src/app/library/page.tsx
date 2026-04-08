@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen, Search, Loader2, Tag, Trash2,
-  Download, Clock, Plus, Brain, X,
+  Download, Clock, Plus, Brain, X, RefreshCw,
 } from "lucide-react";
 import { Report } from "@/lib/supabase";
 import { DIFFICULTY_CONFIG } from "@/lib/constants";
@@ -17,6 +17,7 @@ export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -57,6 +58,52 @@ export default function LibraryPage() {
     setSelectedId(id);
     // 우측 패널이 마운트된 후 인쇄 (이미지/마크다운 렌더링 시간 확보)
     setTimeout(() => window.print(), 400);
+  };
+
+  // ── 재생성: 저장된 원본으로 AI 보고서 다시 생성 ──
+  const handleRegenerate = async (report: Report) => {
+    if (!report.id || !report.original_content) return;
+    if (!confirm("이 보고서를 현재 SKILL 로직으로 재생성합니다.\n원본은 그대로 유지되고, 슬라이드 내용만 새로 생성됩니다.\n진행할까요?")) return;
+
+    setRegeneratingId(report.id);
+    try {
+      // 1) 원본으로 AI 요약 재실행
+      const sumRes = await fetch("/api/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: report.original_content, filename: report.title }),
+      });
+      if (!sumRes.ok) {
+        const err = await sumRes.json();
+        throw new Error(err.error ?? "AI 재분석 실패");
+      }
+      const { report: regenerated } = await sumRes.json();
+
+      // 2) 기존 보고서 PUT — id, original_content, created_at 유지
+      const putRes = await fetch("/api/reports", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: report.id,
+          title: regenerated.title || report.title,
+          subject: regenerated.subject ?? report.subject,
+          difficulty: regenerated.difficulty ?? report.difficulty,
+          summary: regenerated.summary ?? "",
+          key_points: regenerated.key_points ?? [],
+          sections: regenerated.sections ?? [],
+          vocabulary: regenerated.vocabulary ?? [],
+          study_tips: regenerated.study_tips ?? [],
+          tags: regenerated.tags ?? report.tags,
+          original_content: report.original_content, // 원본은 보존
+        }),
+      });
+      if (!putRes.ok) throw new Error("저장 실패");
+      await fetchReports();
+    } catch (e) {
+      alert(`재생성 실패: ${(e as Error).message}`);
+    } finally {
+      setRegeneratingId(null);
+    }
   };
 
   // ── 필터링 ──
@@ -177,9 +224,11 @@ export default function LibraryPage() {
                     key={report.id}
                     report={report}
                     isSelected={selectedId === report.id}
+                    isRegenerating={regeneratingId === report.id}
                     onSelect={() => setSelectedId(report.id ?? null)}
                     onDelete={() => handleDelete(report.id!)}
                     onPdf={() => handlePdf(report.id!)}
+                    onRegenerate={() => handleRegenerate(report)}
                   />
                 ))}
               </div>
@@ -224,12 +273,15 @@ export default function LibraryPage() {
 interface ReportCardProps {
   report: Report;
   isSelected: boolean;
+  isRegenerating: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onPdf: () => void;
+  onRegenerate: () => void;
 }
 
-function ReportCard({ report, isSelected, onSelect, onDelete, onPdf }: ReportCardProps) {
+function ReportCard({ report, isSelected, isRegenerating, onSelect, onDelete, onPdf, onRegenerate }: ReportCardProps) {
+  const canRegenerate = !!report.original_content;
   const diff = DIFFICULTY_CONFIG[report.difficulty as keyof typeof DIFFICULTY_CONFIG] ?? DIFFICULTY_CONFIG.medium;
   const date = report.created_at
     ? new Date(report.created_at).toLocaleDateString("ko-KR", {
@@ -301,6 +353,14 @@ function ReportCard({ report, isSelected, onSelect, onDelete, onPdf }: ReportCar
             title="PDF 다운로드"
           >
             <Download size={13} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
+            disabled={!canRegenerate || isRegenerating}
+            className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={canRegenerate ? "AI 보고서 재생성 (원본 보존)" : "원본이 저장돼 있지 않아 재생성 불가"}
+          >
+            {isRegenerating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
