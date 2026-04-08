@@ -213,7 +213,7 @@ async function main() {
   // 기존 DB 스킬 로드
   let existing;
   try {
-    existing = await sbGet("select=id,name,prompt,source");
+    existing = await sbGet("select=id,name,prompt");
   } catch (e) {
     logErr(`DB 조회 실패: ${e.message}`);
     process.exit(1);
