@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, UnauthorizedError } from "@/lib/api-helpers";
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { LOGIC_SUMMARY_PROMPT } from "@/lib/logic-summary-skill";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -12,38 +10,6 @@ function getClient() {
   }
   return new Anthropic({ apiKey });
 }
-
-/**
- * logic.summary 스킬 로딩
- * 우선순위:
- *   1) 프로젝트 로컬: ./skills/logic.summary/SKILL.md
- *   2) 글로벌: ~/.claude/skills/logic.summary/SKILL.md
- *   3) fallback: 내장 기본 프롬프트
- */
-function loadLogicSummarySkill(): string {
-  const candidates = [
-    join(process.cwd(), "skills", "logic.summary", "SKILL.md"),
-    join(homedir(), ".claude", "skills", "logic.summary", "SKILL.md"),
-  ];
-  for (const path of candidates) {
-    if (existsSync(path)) {
-      try {
-        const raw = readFileSync(path, "utf8");
-        // frontmatter(--- ... ---) 제거
-        return raw.replace(/^---[\s\S]*?---\n?/, "").trim();
-      } catch {}
-    }
-  }
-  return FALLBACK_PROMPT;
-}
-
-const FALLBACK_PROMPT = `당신은 학습 콘텐츠를 복습용 슬라이드로 변환하는 전문가입니다.
-반드시 순수 JSON으로만 응답하세요 (코드블록 없이):
-{
-  "title": "...", "subject": "...", "difficulty": "easy|medium|hard",
-  "summary": "...", "key_points": [], "sections": [], "vocabulary": [],
-  "study_tips": [], "tags": []
-}`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,8 +29,8 @@ export async function POST(request: NextRequest) {
       ? text.slice(0, MAX_TEXT_LENGTH) + "\n\n...(이하 생략: 원문이 너무 길어 앞부분만 분석)"
       : text;
 
-    // logic.summary 스킬을 system prompt로 사용
-    const systemPrompt = loadLogicSummarySkill();
+    // logic.summary 스킬 (인라인된 모듈)을 system prompt로 사용
+    const systemPrompt = LOGIC_SUMMARY_PROMPT;
 
     const message = await getClient().messages.create({
       model: "claude-sonnet-4-6",
