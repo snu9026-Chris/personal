@@ -5,9 +5,15 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Brain, BookOpen, Activity,
   FolderOpen, Clock, ChevronRight, RefreshCw,
-  Terminal, ListChecks,
+  Terminal, ListChecks, Pencil, X, ExternalLink,
 } from "lucide-react";
 import { progressColor } from "@/lib/constants";
+import MarkdownContent from "@/components/MarkdownContent";
+
+const PROJECT_COLOR_PALETTE = [
+  "#6366f1", "#8b5cf6", "#06b6d4", "#10b981",
+  "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9",
+];
 
 // ────── 타입 ──────
 interface Project {
@@ -52,6 +58,7 @@ interface ProgressCard {
   progress: number;
   lastTitle: string;
   lastWhen: string; // iso
+  lastContent: string | null;
   nextStep: string | null;
 }
 
@@ -88,6 +95,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [viewingCard, setViewingCard] = useState<ProgressCard | null>(null);
 
   const fetchAll = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -105,7 +114,14 @@ export default function Home() {
 
       const allProjects: Project[] = pData ?? [];
       const allLogs: RecentLog[] = lData ?? [];
-      setProjects(allProjects.slice(0, 5));
+
+      // 프로젝트 정렬: 각 프로젝트의 최신 log 시각 기준 desc (없으면 created_at)
+      const projectActivity = (p: Project) => {
+        const latest = allLogs.find((l) => l.project_id === p.id);
+        return new Date(latest?.logged_at ?? p.created_at ?? 0).getTime();
+      };
+      const sortedProjects = [...allProjects].sort((a, b) => projectActivity(b) - projectActivity(a));
+      setProjects(sortedProjects.slice(0, 5));
       setReports((rData ?? []).slice(0, 5));
 
       // 최근 기록에 프로젝트 정보 매핑
@@ -118,12 +134,11 @@ export default function Home() {
 
       // ── 진행율 대시보드 카드: 진행 중 프로젝트 + 최신 로그 매핑, 최근 활동순 ──
       // 색 자동 배정: DB color가 기본값(#6366f1)이면 인덱스 기반 팔레트로 override
-      const PALETTE = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9"];
       const cards: ProgressCard[] = allProjects
         .filter((p) => p.status !== "completed")
         .map((p, idx) => {
           const latest = allLogs.find((l) => l.project_id === p.id);
-          const effective = p.color && p.color !== "#6366f1" ? p.color : PALETTE[idx % PALETTE.length];
+          const effective = p.color && p.color !== "#6366f1" ? p.color : PROJECT_COLOR_PALETTE[idx % PROJECT_COLOR_PALETTE.length];
           return {
             id: p.id,
             name: p.name,
@@ -131,6 +146,7 @@ export default function Home() {
             progress: p.progress ?? 0,
             lastTitle: latest?.title ?? "기록 없음",
             lastWhen: latest?.logged_at ?? p.created_at ?? new Date().toISOString(),
+            lastContent: latest?.content ?? null,
             nextStep: latest?.content ? firstNextStep(latest.content) : null,
           };
         })
@@ -204,19 +220,28 @@ export default function Home() {
           ) : (
             <div className="grid md:grid-cols-5 gap-3">
               {projects.map((p) => (
-                <Link key={p.id} href="/projects"
-                  className="card p-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group">
-                  <div className="w-8 h-8 rounded-lg mb-3" style={{ backgroundColor: p.color ?? "#6366f1" }} />
-                  <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 group-hover:text-brand-600 transition-colors">
-                    {p.name}
-                  </p>
-                  {p.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{p.description}</p>}
-                  <div className="mt-2">
-                    <span className={`badge text-xs ${p.status === "completed" ? "bg-emerald-50 text-emerald-600" : "bg-brand-50 text-brand-600"}`}>
-                      {p.status === "completed" ? "완료" : "진행 중"}
-                    </span>
-                  </div>
-                </Link>
+                <div key={p.id} className="relative group">
+                  <Link href="/projects"
+                    className="card p-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block">
+                    <div className="w-8 h-8 rounded-lg mb-3" style={{ backgroundColor: p.color ?? "#6366f1" }} />
+                    <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 group-hover:text-brand-600 transition-colors">
+                      {p.name}
+                    </p>
+                    {p.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{p.description}</p>}
+                    <div className="mt-2">
+                      <span className={`badge text-xs ${p.status === "completed" ? "bg-emerald-50 text-emerald-600" : "bg-brand-50 text-brand-600"}`}>
+                        {p.status === "completed" ? "완료" : "진행 중"}
+                      </span>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingProject(p); }}
+                    className="absolute top-2 right-2 p-1.5 rounded-md bg-white/80 backdrop-blur-sm border border-gray-200 opacity-0 group-hover:opacity-100 hover:bg-brand-50 hover:border-brand-200 transition-all"
+                    aria-label="프로젝트 편집"
+                  >
+                    <Pencil size={11} className="text-gray-500" />
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -292,10 +317,10 @@ export default function Home() {
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
               {progressCards.map((c) => (
-                <Link
+                <button
                   key={c.id}
-                  href="/goals"
-                  className="card p-4 w-72 flex-shrink-0 snap-start flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group border-t-4"
+                  onClick={() => setViewingCard(c)}
+                  className="card p-4 w-72 flex-shrink-0 snap-start flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group border-t-4 text-left"
                   style={{ borderTopColor: c.color }}
                 >
                   {/* 이름 + 마지막 활동 시점 */}
@@ -332,7 +357,7 @@ export default function Home() {
                       <span className="line-clamp-2 leading-snug">{c.nextStep}</span>
                     </div>
                   )}
-                </Link>
+                </button>
               ))}
             </div>
           )}
@@ -425,6 +450,218 @@ export default function Home() {
           )}
         </section>
 
+      </div>
+
+      {/* ── 프로젝트 편집 모달 ── */}
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+          onSaved={() => { setEditingProject(null); fetchAll(true); }}
+        />
+      )}
+
+      {/* ── 진행상황 카드 → 최신 log 미리보기 모달 ── */}
+      {viewingCard && (
+        <LogViewerModal
+          card={viewingCard}
+          onClose={() => setViewingCard(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 프로젝트 편집 모달 (이름 + 색상)
+// ─────────────────────────────────────────────────────────────
+function EditProjectModal({
+  project,
+  onClose,
+  onSaved,
+}: {
+  project: Project;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(project.name);
+  const [color, setColor] = useState(project.color ?? PROJECT_COLOR_PALETTE[0]);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: project.id, name: name.trim(), color }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      onSaved();
+    } catch (err) {
+      alert("저장 실패: " + (err instanceof Error ? err.message : String(err)));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Pencil size={16} className="text-brand-500" />
+            프로젝트 편집
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="닫기">
+            <X size={18} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              이름
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-300"
+              placeholder="프로젝트 이름"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              아이콘 색상
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {PROJECT_COLOR_PALETTE.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`w-9 h-9 rounded-lg transition-all ${
+                    color === c
+                      ? "ring-2 ring-offset-2 ring-brand-400 scale-110"
+                      : "hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: c }}
+                  aria-label={`색상 ${c}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <div className="w-10 h-10 rounded-lg flex-shrink-0" style={{ backgroundColor: color }} />
+            <p className="text-sm text-gray-600 flex-1 truncate font-semibold">{name || "(이름 없음)"}</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !name.trim()}
+            className="px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? "저장 중..." : "저장"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 진행상황 카드 → 최신 log 마크다운 미리보기 모달
+// ─────────────────────────────────────────────────────────────
+function LogViewerModal({
+  card,
+  onClose,
+}: {
+  card: ProgressCard;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div
+          className="px-6 py-4 border-b border-gray-100 border-t-4 rounded-t-2xl"
+          style={{ borderTopColor: card.color }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">
+                {card.name}
+              </p>
+              <h3 className="text-base font-bold text-gray-900 leading-snug line-clamp-2">
+                {card.lastTitle}
+              </h3>
+              <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Clock size={11} />
+                  {new Date(card.lastWhen).toLocaleString("ko-KR", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span>·</span>
+                <span>진행률 {card.progress}%</span>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 rounded hover:bg-gray-100 flex-shrink-0"
+              aria-label="닫기"
+            >
+              <X size={18} className="text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* 본문 — 마크다운 */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {card.lastContent ? (
+            <MarkdownContent content={card.lastContent} />
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-12">
+              아직 기록된 내용이 없습니다.
+            </p>
+          )}
+        </div>
+
+        {/* 푸터 */}
+        <div className="px-6 py-3 border-t border-gray-100 flex justify-end">
+          <Link
+            href="/goals"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand-600 hover:bg-brand-50 rounded-lg transition-colors font-semibold"
+          >
+            <ExternalLink size={12} />
+            전체 진행상황 보기
+          </Link>
+        </div>
       </div>
     </div>
   );
