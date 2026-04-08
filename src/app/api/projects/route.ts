@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase-server";
-import { requireString, requireOneOf, requireUUID, requireUser, handleApiError } from "@/lib/api-helpers";
+import { requireString, requireOneOf, requireUUID, requireUser, handleApiError, ValidationError } from "@/lib/api-helpers";
 
 export async function GET() {
   try {
@@ -52,6 +52,13 @@ export async function PUT(req: NextRequest) {
     if (body.color !== undefined) updateData.color = body.color;
     if (body.status !== undefined) {
       updateData.status = requireOneOf(body.status, ["in_progress", "completed", "paused"], "status");
+    }
+    if (body.progress !== undefined) {
+      const n = Number(body.progress);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        throw new ValidationError("progress는 0~100 사이 정수여야 합니다.");
+      }
+      updateData.progress = Math.round(n);
     }
 
     const { data, error } = await supabase

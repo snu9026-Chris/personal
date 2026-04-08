@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
-  Brain, BookOpen, Target,
-  FolderOpen, Clock, CheckCircle2, Circle, ChevronRight, RefreshCw,
-  Terminal,
+  Brain, BookOpen, Activity,
+  FolderOpen, Clock, ChevronRight, RefreshCw,
+  Terminal, ListChecks,
 } from "lucide-react";
-import {
-  type WeekGoals, type GoalItem,
-  DAYS_SHORT, getMondayOf, getWeekKey, progressColor, migrateGoalDays,
-} from "@/lib/constants";
+import { progressColor } from "@/lib/constants";
 
 // ────── 타입 ──────
 interface Project {
@@ -19,6 +16,8 @@ interface Project {
   description?: string;
   color?: string;
   status?: string;
+  progress?: number;
+  created_at?: string;
 }
 
 interface Report {
@@ -31,6 +30,7 @@ interface Report {
 interface RecentLog {
   id: string;
   title: string;
+  content?: string;
   status: string;
   logged_at: string;
   project_id: string;
@@ -45,47 +45,99 @@ interface SkillItem {
   color: string;
 }
 
+interface ProgressCard {
+  id: string;
+  name: string;
+  color: string;
+  progress: number;
+  lastTitle: string;
+  lastWhen: string; // iso
+  nextStep: string | null;
+}
+
+// 로그 본문에서 "📌 추가 과제" 첫 bullet 추출 (홈 카드 미리보기용)
+function firstNextStep(content: string): string | null {
+  if (!content) return null;
+  const re = /###?\s*📌[^\n]*\n([\s\S]*?)(?=^#{1,6}\s|\n---|\Z)/m;
+  const m = content.match(re);
+  if (!m) return null;
+  for (const line of m[1].split("\n")) {
+    const bm = line.match(/^\s*[-*]\s*(?:\[[ x]\]\s*)?(.+?)\s*$/);
+    if (bm && bm[1].trim()) return bm[1].trim();
+  }
+  return null;
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  if (days < 7) return `${days}일 전`;
+  if (days < 30) return `${Math.floor(days / 7)}주 전`;
+  return `${Math.floor(days / 30)}개월 전`;
+}
+
 // ────── 메인 ──────
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [skills, setSkills] = useState<SkillItem[]>([]);
-  const [weekGoals, setWeekGoals] = useState<WeekGoals>({});
+  const [progressCards, setProgressCards] = useState<ProgressCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const weekKey = getWeekKey(getMondayOf(new Date()));
 
   const fetchAll = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     else setRefreshing(true);
 
     try {
-      const [projRes, reportRes, goalsRes, logsRes, skillsRes] = await Promise.all([
+      const [projRes, reportRes, logsRes, skillsRes] = await Promise.all([
         fetch("/api/projects"),
         fetch("/api/reports"),
-        fetch(`/api/goals?week=${weekKey}`),
         fetch("/api/project-logs"),
         fetch("/api/skills"),
       ]);
-      const [{ projects: pData }, { reports: rData }, { goals: gData }, { logs: lData }, { skills: sData }] =
-        await Promise.all([projRes.json(), reportRes.json(), goalsRes.json(), logsRes.json(), skillsRes.json()]);
+      const [{ projects: pData }, { reports: rData }, { logs: lData }, { skills: sData }] =
+        await Promise.all([projRes.json(), reportRes.json(), logsRes.json(), skillsRes.json()]);
 
-      const allProjects = pData ?? [];
+      const allProjects: Project[] = pData ?? [];
+      const allLogs: RecentLog[] = lData ?? [];
       setProjects(allProjects.slice(0, 5));
       setReports((rData ?? []).slice(0, 5));
 
       // 최근 기록에 프로젝트 정보 매핑
-      const logs = (lData ?? []).slice(0, 5).map((l: { project_id: string; [key: string]: unknown }) => {
-        const proj = allProjects.find((p: Project) => p.id === l.project_id);
+      const enrichedLogs = allLogs.slice(0, 5).map((l) => {
+        const proj = allProjects.find((p) => p.id === l.project_id);
         return { ...l, project_name: proj?.name ?? "알 수 없음", project_color: proj?.color ?? "#6366f1" };
       });
-      setRecentLogs(logs);
+      setRecentLogs(enrichedLogs);
       setSkills((sData ?? []).slice(0, 4));
 
-      setWeekGoals(migrateGoalDays((gData?.days ?? {}) as Record<string, unknown>));
+      // ── 진행율 대시보드 카드: 진행 중 프로젝트 + 최신 로그 매핑, 최근 활동순 ──
+      // 색 자동 배정: DB color가 기본값(#6366f1)이면 인덱스 기반 팔레트로 override
+      const PALETTE = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#0ea5e9"];
+      const cards: ProgressCard[] = allProjects
+        .filter((p) => p.status !== "completed")
+        .map((p, idx) => {
+          const latest = allLogs.find((l) => l.project_id === p.id);
+          const effective = p.color && p.color !== "#6366f1" ? p.color : PALETTE[idx % PALETTE.length];
+          return {
+            id: p.id,
+            name: p.name,
+            color: effective,
+            progress: p.progress ?? 0,
+            lastTitle: latest?.title ?? "기록 없음",
+            lastWhen: latest?.logged_at ?? p.created_at ?? new Date().toISOString(),
+            nextStep: latest?.content ? firstNextStep(latest.content) : null,
+          };
+        })
+        .sort((a, b) => new Date(b.lastWhen).getTime() - new Date(a.lastWhen).getTime())
+        .slice(0, 6);
+      setProgressCards(cards);
+
       setLastUpdated(new Date());
     } catch {
       // 에러 시 기존 데이터 유지
@@ -93,7 +145,7 @@ export default function Home() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [weekKey]);
+  }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -105,15 +157,6 @@ export default function Home() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [fetchAll]);
-
-  // 통계
-  const allGoalItems = useMemo(() => Object.values(weekGoals).flat().filter((g) => g.goal?.trim()), [weekGoals]);
-  const goalsWithContent = allGoalItems.length;
-  const overallProgress = useMemo(() =>
-    goalsWithContent > 0
-      ? Math.round(allGoalItems.reduce((s, g) => s + g.progress, 0) / goalsWithContent)
-      : 0,
-    [allGoalItems, goalsWithContent]);
 
   const fmtTime = (d: Date) => d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
@@ -221,71 +264,76 @@ export default function Home() {
           )}
         </section>
 
-        {/* ── 주간 목표 ── */}
+        {/* ── 진행상황 점검 (가로 박스 스크롤) ── */}
         <section className="rounded-2xl bg-white/70 backdrop-blur-sm border border-purple-200/50 shadow-[0_2px_15px_-3px_rgba(139,92,246,0.1)] p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Target size={20} className="text-amber-500" />
-              이번 주 목표
-              {goalsWithContent > 0 && (
-                <span className="text-sm font-normal text-gray-400">— 전체 달성률 {overallProgress}%</span>
+              <Activity size={20} className="text-amber-500" />
+              진행율 대시보드
+              {progressCards.length > 0 && (
+                <span className="text-sm font-normal text-gray-400">— 최근 활동순 {progressCards.length}개</span>
               )}
             </h2>
             <Link href="/goals" className="text-sm text-amber-600 hover:underline flex items-center gap-1">
-              목표 편집<ChevronRight size={14} />
+              전체 보기<ChevronRight size={14} />
             </Link>
           </div>
 
           {loading ? (
-            <div className="grid sm:grid-cols-7 gap-2">
-              {[...Array(7)].map((_, i) => <div key={i} className="card p-3 h-28 animate-pulse bg-gray-50" />)}
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {[...Array(4)].map((_, i) => <div key={i} className="card p-4 h-40 w-72 flex-shrink-0 animate-pulse bg-gray-50" />)}
             </div>
-          ) : goalsWithContent === 0 ? (
+          ) : progressCards.length === 0 ? (
             <div className="card p-8 text-center text-gray-400">
-              <Target size={32} className="mx-auto mb-2 text-gray-200" />
-              <p className="text-sm">이번 주 목표가 아직 없습니다</p>
-              <Link href="/goals" className="text-xs text-amber-600 underline mt-1 inline-block">목표 설정하기 →</Link>
+              <Activity size={32} className="mx-auto mb-2 text-gray-200" />
+              <p className="text-sm">진행 중인 프로젝트가 없습니다</p>
+              <Link href="/projects" className="text-xs text-amber-600 underline mt-1 inline-block">프로젝트 시작하기 →</Link>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-7 gap-2">
-              {DAYS_SHORT.map((day, i) => {
-                const items = (weekGoals[String(i)] ?? []).filter((g) => g.goal?.trim());
-                const allDone = items.length > 0 && items.every((g) => g.progress >= 100);
-                return (
-                  <Link key={i} href="/goals"
-                    className="card p-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group flex flex-col gap-2">
-                    {/* 요일 헤더 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-500">{day}요일</span>
-                      {items.length > 0 && (
-                        allDone
-                          ? <CheckCircle2 size={13} className="text-emerald-500" />
-                          : <Circle size={13} className="text-gray-300" />
-                      )}
-                    </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+              {progressCards.map((c) => (
+                <Link
+                  key={c.id}
+                  href="/goals"
+                  className="card p-4 w-72 flex-shrink-0 snap-start flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group border-t-4"
+                  style={{ borderTopColor: c.color }}
+                >
+                  {/* 이름 + 마지막 활동 시점 */}
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-1 group-hover:text-brand-600 transition-colors">
+                      {c.name}
+                    </h3>
+                    <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0">
+                      <Clock size={10} />{relativeTime(c.lastWhen)}
+                    </span>
+                  </div>
 
-                    {/* 목표 목록 */}
-                    {items.length === 0 ? (
-                      <p className="text-xs text-gray-300 italic">목표 없음</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {items.map((g, gi) => (
-                          <div key={gi}>
-                            <p className="text-[11px] text-gray-700 font-medium line-clamp-1 leading-snug mb-1">
-                              {gi + 1}. {g.goal}
-                            </p>
-                            <div className="w-full bg-gray-100 rounded-full h-1">
-                              <div className="h-1 rounded-full transition-all"
-                                style={{ width: `${g.progress}%`, backgroundColor: progressColor(g.progress) }} />
-                            </div>
-                            <p className="text-right text-[10px] text-gray-400 mt-0.5">{g.progress}%</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
+                  {/* 진행률 바 */}
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] mb-1">
+                      <span className="font-semibold text-gray-500 uppercase tracking-wide">진행률</span>
+                      <span className="font-bold" style={{ color: c.color }}>{c.progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full transition-all"
+                        style={{ width: `${c.progress}%`, backgroundColor: progressColor(c.progress) }} />
+                    </div>
+                  </div>
+
+                  {/* 마지막 작업 */}
+                  <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">
+                    {c.lastTitle}
+                  </p>
+
+                  {/* 다음 할 일 (있을 때만) */}
+                  {c.nextStep && (
+                    <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50/70 rounded-lg p-2 border border-amber-100">
+                      <ListChecks size={11} className="mt-0.5 flex-shrink-0" />
+                      <span className="line-clamp-2 leading-snug">{c.nextStep}</span>
+                    </div>
+                  )}
+                </Link>
+              ))}
             </div>
           )}
         </section>

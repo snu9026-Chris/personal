@@ -117,6 +117,31 @@ async function sbPatch(id, body) {
   return res.json();
 }
 
+// ─── "핵심 요약" 섹션에서 bullet 추출 ───
+// 마크다운 본문에서 `## 핵심 요약` 또는 `### 핵심 요약` 헤딩 아래의 -/* bullet들을 추출.
+// 다음 같은 레벨 헤딩이나 ---에서 종료.
+function extractHighlights(body) {
+  if (!body) return [];
+  const re = /^(#{2,3})\s*핵심\s*요약\s*$/m;
+  const m = body.match(re);
+  if (!m) return [];
+  const startLevel = m[1].length;
+  const startIdx = m.index + m[0].length;
+  const rest = body.slice(startIdx);
+
+  // 종료 지점: 같은/상위 레벨의 다른 헤딩, 또는 --- 구분선
+  const endRe = new RegExp(`^(#{1,${startLevel}}\\s|---\\s*$)`, "m");
+  const endMatch = rest.match(endRe);
+  const section = endMatch ? rest.slice(0, endMatch.index) : rest;
+
+  const bullets = [];
+  for (const line of section.split("\n")) {
+    const bm = line.match(/^\s*[-*]\s+(.+?)\s*$/);
+    if (bm) bullets.push(bm[1].trim());
+  }
+  return bullets;
+}
+
 // ─── frontmatter 파서 (lightweight, no yaml lib) ───
 function parseFrontmatter(raw) {
   const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
@@ -157,7 +182,7 @@ function collectFormalSkills() {
         name,
         description: (meta.description || "").toString().slice(0, 500),
         trigger: Array.isArray(meta.triggers) ? meta.triggers.join(" / ") : (meta.triggers || ""),
-        details: [],
+        details: extractHighlights(body),
         badges: ["formal", "SKILL.md"],
         color: "purple",
         location: `~/.claude/skills/${dir}/SKILL.md`,
@@ -195,13 +220,14 @@ function collectClaudeMdSkills() {
     const name = nameMatch[1].trim();
     if (!name) continue;
 
-    // description: 첫 ~300자
-    const description = body
-      .replace(/^>\s.*$/gm, "") // blockquote 제거
-      .replace(/^#{1,6}\s.*$/gm, "") // sub-heading 제거
+    // description: 첫 서브섹션(### ...) 또는 --- 전까지의 intro 텍스트만
+    const introMatch = body.match(/^([\s\S]*?)(?=^#{2,6}\s|^---\s*$)/m);
+    const intro = introMatch ? introMatch[1] : body;
+    const description = intro
+      .replace(/^>\s.*$/gm, "")
       .split("\n")
-      .filter((l) => l.trim())
-      .slice(0, 5)
+      .map((l) => l.trim())
+      .filter(Boolean)
       .join(" ")
       .slice(0, 300);
 
@@ -219,11 +245,11 @@ function collectClaudeMdSkills() {
       name,
       description,
       trigger: triggers.join(" / "),
-      details: [],
+      details: extractHighlights(body),
       badges: ["CLAUDE.md"],
       color: "blue",
       location: "~/.claude/CLAUDE.md",
-      prompt: null, // CLAUDE.md 스킬은 prompt 없음
+      prompt: null,
       source: "claude-md",
     });
   }
@@ -239,12 +265,20 @@ async function main() {
   // 기존 DB 스킬 로드
   let existing;
   try {
-    existing = await sbGet("select=id,name,prompt");
+    existing = await sbGet("select=id,name,prompt,description,trigger,details");
   } catch (e) {
     logErr(`DB 조회 실패: ${e.message}`);
     process.exit(1);
   }
   const byName = new Map(existing.map((s) => [s.name.toLowerCase(), s]));
+
+  function detailsEqual(a, b) {
+    const A = Array.isArray(a) ? a : [];
+    const B = Array.isArray(b) ? b : [];
+    if (A.length !== B.length) return false;
+    for (let i = 0; i < A.length; i++) if (A[i] !== B[i]) return false;
+    return true;
+  }
 
   let inserted = 0;
   let updated = 0;
@@ -271,12 +305,13 @@ async function main() {
         catch (e) { logErr(`    fail: ${e.message}`); errors++; }
       } else inserted++;
     } else {
-      // prompt나 description이 다르면 update
       const changed =
         (dbRow.prompt || "") !== (skill.prompt || "") ||
-        false; // 다른 필드 비교는 생략 (prompt가 핵심)
+        (dbRow.description || "") !== (skill.description || "") ||
+        (dbRow.trigger || "") !== (skill.trigger || "") ||
+        !detailsEqual(dbRow.details, skill.details);
       if (changed) {
-        log(`  ~ UPDATE  ${skill.name}  (prompt changed)`);
+        log(`  ~ UPDATE  ${skill.name}  (SKILL.md changed)`);
         if (!DRY) {
           try { await sbPatch(dbRow.id, payload); updated++; }
           catch (e) { logErr(`    fail: ${e.message}`); errors++; }
@@ -287,29 +322,39 @@ async function main() {
     }
   }
 
-  // ── CLAUDE.md 스킬: 신규만 INSERT (기존 보존) ──
+  // ── CLAUDE.md 스킬: details/description/trigger 변경 시 upsert (prompt는 건드리지 않음) ──
   for (const skill of claudeMd) {
     const dbRow = byName.get(skill.name.toLowerCase());
-    if (dbRow) {
-      // 이미 있으면 건드리지 않음 (사용자가 web UI에서 수정했을 수도)
-      unchanged++;
+    const payload = {
+      name: skill.name,
+      description: skill.description,
+      trigger: skill.trigger,
+      details: skill.details,
+      badges: skill.badges,
+      color: skill.color,
+      location: skill.location,
+    };
+    if (!dbRow) {
+      log(`  + INSERT  ${skill.name}  (CLAUDE.md, new)`);
+      if (!DRY) {
+        try { await sbInsert(payload); inserted++; }
+        catch (e) { logErr(`    fail: ${e.message}`); errors++; }
+      } else inserted++;
       continue;
     }
-    log(`  + INSERT  ${skill.name}  (CLAUDE.md, new)`);
-    if (!DRY) {
-      try {
-        await sbInsert({
-          name: skill.name,
-          description: skill.description,
-          trigger: skill.trigger,
-          details: skill.details,
-          badges: skill.badges,
-          color: skill.color,
-          location: skill.location,
-        });
-        inserted++;
-      } catch (e) { logErr(`    fail: ${e.message}`); errors++; }
-    } else inserted++;
+    const changed =
+      (dbRow.description || "") !== (skill.description || "") ||
+      (dbRow.trigger || "") !== (skill.trigger || "") ||
+      !detailsEqual(dbRow.details, skill.details);
+    if (changed) {
+      log(`  ~ UPDATE  ${skill.name}  (CLAUDE.md, summary changed)`);
+      if (!DRY) {
+        try { await sbPatch(dbRow.id, payload); updated++; }
+        catch (e) { logErr(`    fail: ${e.message}`); errors++; }
+      } else updated++;
+    } else {
+      unchanged++;
+    }
   }
 
   const summary = `sync-skills: 신규 ${inserted}, 갱신 ${updated}, 변경없음 ${unchanged}${errors ? `, 에러 ${errors}` : ""}${DRY ? " (DRY RUN)" : ""}`;

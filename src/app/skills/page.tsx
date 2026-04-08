@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Upload, Rocket, Terminal, Code, FileText,
-  Plus, X, Save, Loader2, Edit3, Trash2,
+  Plus, X, Save, Loader2, Edit3, Trash2, ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -43,6 +43,27 @@ const COLOR_OPTIONS = [
 
 type TabType = "skills" | "write";
 
+// 인라인 마크다운: **bold** + `code` 만 처리
+function renderInlineMarkdown(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push(text.slice(lastIdx, m.index));
+    const tok = m[0];
+    if (tok.startsWith("**")) {
+      parts.push(<strong key={key++} className="font-semibold text-gray-900">{tok.slice(2, -2)}</strong>);
+    } else {
+      parts.push(<code key={key++} className="bg-white border border-gray-200 text-purple-600 px-1.5 py-0.5 rounded text-[11px] font-mono">{tok.slice(1, -1)}</code>);
+    }
+    lastIdx = m.index + tok.length;
+  }
+  if (lastIdx < text.length) parts.push(text.slice(lastIdx));
+  return parts;
+}
+
 // ──────────────────────────────────────────
 // 메인
 // ──────────────────────────────────────────
@@ -50,6 +71,7 @@ export default function SkillsPage() {
   const [tab, setTab] = useState<TabType>("skills");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   // 작성 폼
   const [skillName, setSkillName] = useState("");
@@ -180,6 +202,8 @@ export default function SkillsPage() {
             skills.map((skill) => {
               const c = COLOR_MAP[skill.color] ?? DEFAULT_COLOR;
               const Icon = c.icon;
+              const isOpen = !!expanded[skill.id];
+              const hasDetails = skill.details && skill.details.length > 0;
               return (
                 <div key={skill.id} className={`card p-6 border ${c.border}`}>
                   <div className="flex gap-4 items-start">
@@ -187,8 +211,9 @@ export default function SkillsPage() {
                       <Icon size={24} className={c.text} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-wrap">
+                      {/* 헤더: 이름 + 배지 + 삭제 */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3 flex-wrap min-w-0">
                           <h2 className="font-bold text-gray-900 text-lg">{skill.name}</h2>
                           <div className="flex flex-wrap gap-1.5">
                             {skill.badges.map((b) => (
@@ -199,33 +224,59 @@ export default function SkillsPage() {
                         <button
                           onClick={() => handleDelete(skill.id)}
                           className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
+                          aria-label="삭제"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
+
+                      {/* 한 줄 요약 */}
                       <p className="text-sm text-gray-600 mt-2 leading-relaxed">{skill.description}</p>
 
-                      {skill.details.length > 0 && (
-                        <div className="mt-4 space-y-1.5">
-                          {skill.details.map((d, i) => (
-                            <div key={i} className="flex items-start gap-2 text-sm text-gray-500">
-                              <span className="text-gray-300 mt-0.5">-</span>
-                              <span>{d}</span>
-                            </div>
-                          ))}
+                      {/* 자세히 보기 토글 */}
+                      {hasDetails && (
+                        <button
+                          onClick={() => setExpanded((prev) => ({ ...prev, [skill.id]: !prev[skill.id] }))}
+                          className={`mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${c.badge} hover:opacity-80 transition-opacity`}
+                        >
+                          <ChevronDown
+                            size={13}
+                            className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          />
+                          {isOpen ? "접기" : "자세히 보기"}
+                        </button>
+                      )}
+
+                      {/* 펼침 내용: 핵심 bullet 리스트 */}
+                      {hasDetails && isOpen && (
+                        <div className={`mt-4 rounded-xl ${c.bg} border ${c.border} p-4`}>
+                          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-3">
+                            핵심 요약
+                          </h4>
+                          <ol className="space-y-2.5">
+                            {skill.details.map((d, i) => (
+                              <li key={i} className="flex items-start gap-3 text-sm text-gray-700 leading-relaxed">
+                                <span className={`flex-shrink-0 w-5 h-5 rounded-full ${c.badge} flex items-center justify-center text-[10px] font-bold`}>
+                                  {i + 1}
+                                </span>
+                                <span className="flex-1">{renderInlineMarkdown(d)}</span>
+                              </li>
+                            ))}
+                          </ol>
                         </div>
                       )}
 
+                      {/* 푸터: 트리거 + 위치 */}
                       <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-100 flex-wrap">
                         {skill.trigger && (
-                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                            <Code size={12} />
-                            트리거: <span className="font-mono text-gray-500">{skill.trigger}</span>
+                          <div className="flex items-start gap-1.5 text-xs text-gray-400">
+                            <Code size={12} className="mt-0.5 flex-shrink-0" />
+                            <span>트리거: <span className="font-mono text-gray-500">{skill.trigger}</span></span>
                           </div>
                         )}
                         <div className="flex items-center gap-1.5 text-xs text-gray-400">
                           <FileText size={12} />
-                          {skill.location}
+                          <span className="font-mono">{skill.location}</span>
                         </div>
                       </div>
                     </div>
