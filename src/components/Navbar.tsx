@@ -18,22 +18,32 @@ const navItems = [
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [authState, setAuthState] = useState<"loading" | "in" | "out">("loading");
+  // 기본값 "out" — 스피너 단계 없이 바로 로그인 버튼 보이게 (iOS Safari 등에서 getUser 지연/실패 시 사용자가 갇히지 않도록)
+  const [authState, setAuthState] = useState<"in" | "out">("out");
   const [email, setEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
     let mounted = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!mounted) return;
-      if (data.user) {
-        setAuthState("in");
-        setEmail(data.user.email ?? null);
-      } else {
-        setAuthState("out");
-      }
-    });
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch {
+      return; // env 누락 등 — 그냥 "out" 상태 유지
+    }
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (!mounted) return;
+        if (data.user) {
+          setAuthState("in");
+          setEmail(data.user.email ?? null);
+        } else {
+          setAuthState("out");
+        }
+      })
+      .catch(() => {
+        if (mounted) setAuthState("out");
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
       if (session?.user) {
@@ -95,7 +105,7 @@ export default function Navbar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium
+                  className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3.5 py-2 rounded-xl text-sm font-medium
                               transition-all duration-150
                               ${isActive
                                 ? "bg-brand-50 text-brand-600"
@@ -109,10 +119,8 @@ export default function Navbar() {
             })}
 
             {/* 인증 상태 */}
-            <div className="ml-2 pl-2 border-l border-gray-200 flex items-center gap-2">
-              {authState === "loading" ? (
-                <Loader2 size={16} className="animate-spin text-gray-400" />
-              ) : authState === "in" ? (
+            <div className="ml-1 sm:ml-2 pl-1 sm:pl-2 border-l border-gray-200 flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              {authState === "in" ? (
                 <>
                   <span className="hidden md:block text-xs text-gray-500 max-w-[160px] truncate" title={email ?? ""}>
                     {email}
@@ -131,7 +139,8 @@ export default function Navbar() {
                 <button
                   onClick={signInWithGoogle}
                   disabled={busy}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 transition-colors shadow-sm"
+                  title="Google 로그인"
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
                   <span className="hidden sm:block">Google 로그인</span>
