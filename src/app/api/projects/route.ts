@@ -5,9 +5,12 @@ import { requireString, requireOneOf, requireUUID, requireUser, handleApiError, 
 export async function GET() {
   try {
     await requireUser();
+    // deleted_at이 null이거나 24시간 이내 삭제된 것 포함
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("projects")
       .select("*")
+      .or(`deleted_at.is.null,deleted_at.gte.${cutoff}`)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return NextResponse.json({ projects: data ?? [] });
@@ -47,6 +50,7 @@ export async function PUT(req: NextRequest) {
     const id = requireUUID(body.id, "id");
 
     const updateData: Record<string, unknown> = {};
+    if (body.restore === true) updateData.deleted_at = null;
     if (body.name !== undefined) updateData.name = requireString(body.name, "name");
     if (body.description !== undefined) updateData.description = body.description;
     if (body.color !== undefined) updateData.color = body.color;
@@ -80,7 +84,10 @@ export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-    const { error } = await supabase.from("projects").delete().eq("id", id);
+    const { error } = await supabase
+      .from("projects")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err) {

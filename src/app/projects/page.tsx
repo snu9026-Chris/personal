@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   FolderOpen, Plus, ChevronRight, Clock, Tag, CheckCircle2,
   AlertCircle, Circle, Loader2, Trash2, X, Save, ArrowLeft, Pencil, FileText, Activity,
-  Pencil as PencilIcon
+  Pencil as PencilIcon, RotateCcw
 } from "lucide-react";
 import MarkdownContent from "@/components/MarkdownContent";
 import { SectionRenderer } from "@/components/ReportPreview";
@@ -19,6 +19,7 @@ interface Project {
   status: "in_progress" | "completed" | "paused";
   color: string;
   created_at: string;
+  deleted_at: string | null;
 }
 
 interface ProjectLog {
@@ -215,12 +216,25 @@ export default function ProjectsPage() {
     }
   };
 
-  // ── 프로젝트 삭제 ──
+  // ── 프로젝트 삭제 (soft delete) ──
   const handleDeleteProject = async (id: string) => {
-    if (!confirm("이 프로젝트와 모든 로그를 삭제하시겠습니까?")) return;
+    if (!confirm("이 프로젝트를 삭제하시겠습니까? 24시간 내 복원 가능합니다.")) return;
     await fetch(`/api/projects?id=${id}`, { method: "DELETE" });
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    if (selectedId === id) setSelectedId(projects.find((p) => p.id !== id)?.id ?? null);
+    setProjects((prev) => prev.map((p) =>
+      p.id === id ? { ...p, deleted_at: new Date().toISOString() } : p
+    ));
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  // ── 프로젝트 복원 ──
+  const handleRestoreProject = async (id: string) => {
+    const res = await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, restore: true }),
+    });
+    const { project } = await res.json();
+    setProjects((prev) => prev.map((p) => (p.id === project.id ? project : p)));
   };
 
   // ── 기획 문서 저장 ──
@@ -318,25 +332,43 @@ export default function ProjectsPage() {
               </button>
             </div>
           ) : (
-            projects.map((p) => (
+            projects.map((p) => {
+              const isDeleted = !!p.deleted_at;
+              return (
               <div
                 key={p.id}
-                onClick={() => setSelectedId(p.id)}
+                onClick={() => !isDeleted && setSelectedId(p.id)}
                 className={`w-full text-left px-3 py-3 rounded-xl flex items-center gap-3
-                            group transition-all duration-150 cursor-pointer
-                            ${selectedId === p.id
-                              ? "bg-brand-50 border border-brand-100"
-                              : "hover:bg-gray-50 border border-transparent"}`}
+                            group transition-all duration-150
+                            ${isDeleted
+                              ? "opacity-40 border border-dashed border-gray-300 cursor-default"
+                              : `cursor-pointer ${selectedId === p.id
+                                ? "bg-brand-50 border border-brand-100"
+                                : "hover:bg-gray-50 border border-transparent"}`}`}
               >
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium truncate ${selectedId === p.id ? "text-brand-700" : "text-gray-800"}`}>
+                  <p className={`text-sm font-medium truncate ${isDeleted ? "text-gray-400 line-through" : selectedId === p.id ? "text-brand-700" : "text-gray-800"}`}>
                     {p.name}
                   </p>
-                  {p.description && (
+                  {isDeleted ? (
+                    <p className="text-xs text-red-400 mt-0.5">24시간 내 자동 삭제</p>
+                  ) : p.description && (
                     <p className="text-xs text-gray-400 truncate mt-0.5">{p.description}</p>
                   )}
                 </div>
+                {isDeleted ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleRestoreProject(p.id); }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-50 text-brand-600
+                               text-xs font-medium hover:bg-brand-100 transition-colors"
+                    title="복원"
+                  >
+                    <RotateCcw size={12} />
+                    복원
+                  </button>
+                ) : (
+                <>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => { e.stopPropagation(); setEditingProject(p); }}
@@ -356,8 +388,11 @@ export default function ProjectsPage() {
                   </button>
                 </div>
                 {selectedId === p.id && <ChevronRight size={14} className="text-brand-400 flex-shrink-0" />}
+                </>
+                )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </aside>
