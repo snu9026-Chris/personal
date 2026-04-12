@@ -278,7 +278,7 @@ export default function ProjectsPage() {
 
   // ──────────────────────────────────────────
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 flex flex-col md:flex-row">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 flex flex-col md:flex-row overflow-hidden">
 
       {/* ────── 왼쪽: 프로젝트 목록 (모바일에선 선택 시 숨김) ────── */}
       <aside className={`${selectedProject ? "hidden md:flex" : "flex"} w-full md:w-72 md:flex-shrink-0 bg-white border-r border-gray-100 flex-col`}>
@@ -363,11 +363,11 @@ export default function ProjectsPage() {
       </aside>
 
       {/* ────── 오른쪽: 타임라인 (모바일에선 선택 안 했을 때 숨김) ────── */}
-      <main className={`${selectedProject ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
+      <main className={`${selectedProject ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0 min-h-0`}>
         {selectedProject ? (
           <>
             {/* 프로젝트 헤더 */}
-            <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4">
+            <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex-shrink-0">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
                   <button
