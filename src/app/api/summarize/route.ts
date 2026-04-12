@@ -74,23 +74,40 @@ export async function POST(request: NextRequest) {
 
     const responseText = message.content[0].type === "text" ? message.content[0].text : "";
 
-    // JSON 파싱
+    // JSON 파싱 (다단계 시도)
     let reportData;
+    const cleaned = responseText
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
+
+    // 1차: 그대로 파싱
     try {
-      const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       reportData = JSON.parse(cleaned);
     } catch {
-      reportData = {
-        title: filename || "학습 노트",
-        subject: "일반",
-        difficulty: "medium",
-        summary: responseText.substring(0, 300),
-        key_points: ["내용을 확인하세요"],
-        sections: [{ title: "전체 내용", content: responseText, type: "summary", layout: "bullets" }],
-        vocabulary: [],
-        study_tips: [],
-        tags: [],
-      };
+      // 2차: JSON 부분만 추출 (앞뒤에 설명 텍스트가 붙은 경우)
+      try {
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          reportData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("no json");
+        }
+      } catch {
+        // 3차: fallback
+        reportData = {
+          title: filename || "학습 노트",
+          subject: "일반",
+          difficulty: "medium",
+          summary: responseText.substring(0, 300),
+          key_points: ["내용을 확인하세요"],
+          sections: [{ title: "전체 내용", content: responseText, type: "summary", layout: "bullets" }],
+          vocabulary: [],
+          study_tips: [],
+          tags: [],
+        };
+      }
     }
 
     return NextResponse.json({ report: reportData });
