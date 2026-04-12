@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   FolderOpen, Plus, ChevronRight, Clock, Tag, CheckCircle2,
-  AlertCircle, Circle, Loader2, Trash2, X, Save, ArrowLeft, Pencil
+  AlertCircle, Circle, Loader2, Trash2, X, Save, ArrowLeft, Pencil, FileText, Activity
 } from "lucide-react";
 import MarkdownContent from "@/components/MarkdownContent";
 
@@ -287,95 +287,120 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            {/* 타임라인 */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
-              {loadingLogs ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 size={24} className="animate-spin text-gray-300" />
-                </div>
-              ) : logs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
-                    <Clock size={28} className="text-gray-300" />
+            {/* 콘텐츠 2컬럼 */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-col lg:flex-row h-full">
+
+                {/* 왼쪽: 기획 초안 */}
+                <div className="lg:w-1/2 lg:border-r border-gray-100 px-4 md:px-6 py-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText size={16} className="text-brand-500" />
+                    <h2 className="font-bold text-gray-900 text-sm">기획 초안</h2>
                   </div>
-                  <p className="text-gray-400 font-medium">아직 로그가 없습니다</p>
-                  <p className="text-gray-300 text-sm mt-1">
-                    Claude Code에서 <code className="px-1.5 py-0.5 bg-gray-100 rounded text-brand-600 font-mono text-xs">update.recent</code> 트리거 시 자동 기록됩니다
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
+                      <FileText size={24} className="text-gray-300" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">아직 기획 초안이 없습니다</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="max-w-3xl mx-auto space-y-8">
-                  {Object.entries(groupedLogs).map(([date, dateLogs]) => (
-                    <div key={date}>
-                      {/* 날짜 헤더 */}
-                      <div className="flex items-center gap-3 mb-4 sticky top-0 bg-gray-50 py-2 z-10">
-                        <div className="h-px flex-1 bg-gray-200" />
-                        <span className="text-sm font-semibold text-gray-500 bg-gray-100
-                                         px-3 py-1 rounded-full flex-shrink-0">
-                          📅 {date}
-                        </span>
-                        <div className="h-px flex-1 bg-gray-200" />
+
+                {/* 오른쪽: 업데이트 현황 */}
+                <div className="lg:w-1/2 px-4 md:px-6 py-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Activity size={16} className="text-brand-500" />
+                    <h2 className="font-bold text-gray-900 text-sm">업데이트 현황</h2>
+                  </div>
+                  {loadingLogs ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 size={24} className="animate-spin text-gray-300" />
+                    </div>
+                  ) : logs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
+                        <Clock size={24} className="text-gray-300" />
                       </div>
+                      <p className="text-gray-400 text-sm font-medium">아직 로그가 없습니다</p>
+                      <p className="text-gray-300 text-xs mt-1">
+                        Claude Code에서 <code className="px-1.5 py-0.5 bg-gray-100 rounded text-brand-600 font-mono text-xs">update.recent</code> 트리거 시 자동 기록됩니다
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {Object.entries(groupedLogs).map(([date, dateLogs]) => (
+                        <div key={date}>
+                          {/* 날짜 헤더 */}
+                          <div className="flex items-center gap-3 mb-4 sticky top-0 bg-gray-50 py-2 z-10">
+                            <div className="h-px flex-1 bg-gray-200" />
+                            <span className="text-xs font-semibold text-gray-500 bg-gray-100
+                                             px-3 py-1 rounded-full flex-shrink-0">
+                              {date}
+                            </span>
+                            <div className="h-px flex-1 bg-gray-200" />
+                          </div>
 
-                      {/* 로그 카드들 */}
-                      <div className="space-y-3 relative">
-                        {/* 타임라인 선 */}
-                        <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-100" />
+                          {/* 로그 카드들 */}
+                          <div className="space-y-3 relative">
+                            {/* 타임라인 선 */}
+                            <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-100" />
 
-                        {dateLogs.map((log) => {
-                          const sc = STATUS_CONFIG[log.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.in_progress;
-                          const StatusIcon = sc.icon;
-                          return (
-                            <div key={log.id} className="flex gap-4 group">
-                              {/* 타임라인 도트 */}
-                              <div className="flex-shrink-0 w-10 flex items-start justify-center pt-3 z-10">
-                                <StatusIcon size={16} className={sc.color} fill={log.status === "completed" ? "currentColor" : "none"} />
-                              </div>
-
-                              {/* 카드 */}
-                              <div className="flex-1 card p-4 hover:shadow-sm transition-shadow">
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="font-semibold text-gray-900">{log.title}</h3>
-                                    <span className={`badge text-xs ${sc.bg}`}>{sc.label}</span>
+                            {dateLogs.map((log) => {
+                              const sc = STATUS_CONFIG[log.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.in_progress;
+                              const StatusIcon = sc.icon;
+                              return (
+                                <div key={log.id} className="flex gap-4 group">
+                                  {/* 타임라인 도트 */}
+                                  <div className="flex-shrink-0 w-10 flex items-start justify-center pt-3 z-10">
+                                    <StatusIcon size={16} className={sc.color} fill={log.status === "completed" ? "currentColor" : "none"} />
                                   </div>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <span className="text-xs text-gray-400">
-                                      {new Date(log.logged_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                                    </span>
-                                    <button
-                                      onClick={() => handleDeleteLog(log.id)}
-                                      className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md
-                                                 hover:bg-red-50 text-gray-400 hover:text-red-500
-                                                 flex items-center justify-center transition-all"
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
+
+                                  {/* 카드 */}
+                                  <div className="flex-1 card p-4 hover:shadow-sm transition-shadow">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="font-semibold text-gray-900 text-sm">{log.title}</h3>
+                                        <span className={`badge text-xs ${sc.bg}`}>{sc.label}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        <span className="text-xs text-gray-400">
+                                          {new Date(log.logged_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                        <button
+                                          onClick={() => handleDeleteLog(log.id)}
+                                          className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md
+                                                     hover:bg-red-50 text-gray-400 hover:text-red-500
+                                                     flex items-center justify-center transition-all"
+                                        >
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {log.content && (
+                                      <MarkdownContent content={log.content} className="mb-3" />
+                                    )}
+
+                                    {log.tags?.length > 0 && (
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {log.tags.map((tag) => (
+                                          <span key={tag} className="badge bg-gray-100 text-gray-500 text-xs">
+                                            <Tag size={9} className="mr-1" />{tag}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-
-                                {log.content && (
-                                  <MarkdownContent content={log.content} className="mb-3" />
-                                )}
-
-                                {log.tags?.length > 0 && (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    {log.tags.map((tag) => (
-                                      <span key={tag} className="badge bg-gray-100 text-gray-500 text-xs">
-                                        <Tag size={9} className="mr-1" />{tag}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+
+              </div>
             </div>
           </>
         ) : (

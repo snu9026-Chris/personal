@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BookOpen, Activity, Home, Brain, FolderOpen, Terminal, LogIn, LogOut, Loader2 } from "lucide-react";
+import { BookOpen, Activity, Brain, FolderOpen, Terminal, LogIn, LogOut, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 
 const navItems = [
-  { href: "/",         label: "홈",           icon: Home },
-  { href: "/study",    label: "학습 내용 업로드", icon: Brain },
+  { href: "/study",    label: "업로드",         icon: Brain },
   { href: "/library",  label: "라이브러리",    icon: BookOpen },
-  { href: "/projects", label: "진행 프로젝트", icon: FolderOpen },
-  { href: "/goals",    label: "진행율 대시보드", icon: Activity },
+  { href: "/projects", label: "프로젝트",       icon: FolderOpen },
+  { href: "/goals",    label: "진행 대시보드",   icon: Activity },
   { href: "/skills",   label: "스킬",         icon: Terminal },
 ];
 
