@@ -288,11 +288,11 @@ export default function ProjectsPage() {
             </div>
 
             {/* 콘텐츠 2컬럼 */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-hidden">
               <div className="flex flex-col lg:flex-row h-full">
 
                 {/* 왼쪽: 기획 초안 */}
-                <div className="lg:w-1/2 lg:border-r border-gray-100 px-4 md:px-6 py-6">
+                <div className="lg:w-1/2 lg:border-r border-gray-100 px-4 md:px-6 py-6 overflow-hidden">
                   <div className="flex items-center gap-2 mb-4">
                     <FileText size={16} className="text-brand-500" />
                     <h2 className="font-bold text-gray-900 text-sm">기획 초안</h2>
@@ -306,7 +306,7 @@ export default function ProjectsPage() {
                 </div>
 
                 {/* 오른쪽: 업데이트 현황 */}
-                <div className="lg:w-1/2 px-4 md:px-6 py-6">
+                <div className="lg:w-1/2 px-4 md:px-6 py-6 overflow-y-auto">
                   <div className="flex items-center gap-2 mb-4">
                     <Activity size={16} className="text-brand-500" />
                     <h2 className="font-bold text-gray-900 text-sm">업데이트 현황</h2>
