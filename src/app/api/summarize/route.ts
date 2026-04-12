@@ -62,53 +62,103 @@ export async function POST(request: NextRequest) {
     // logic.summary 스킬 system prompt — DB → 캐시 → fallback 순으로 결정
     const systemPrompt = await getLogicSummaryPrompt();
 
+    // tool_use로 JSON schema 강제 — LLM이 반드시 구조화된 JSON을 반환
+    const REPORT_TOOL: Anthropic.Tool = {
+      name: "create_report",
+      description: "학습 자료를 분석하여 구조화된 슬라이드 보고서를 생성한다. 반드시 이 tool을 사용하여 결과를 반환할 것.",
+      input_schema: {
+        type: "object" as const,
+        required: ["title", "subject", "difficulty", "summary", "key_points", "sections", "tags"],
+        properties: {
+          title: { type: "string", description: "슬라이드 제목" },
+          subject: { type: "string", description: "과목/분야" },
+          difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+          summary: { type: "string", description: "2문장 이내 핵심 요약" },
+          key_points: { type: "array", items: { type: "string" }, description: "핵심 포인트 3~6개" },
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["title", "type", "layout", "key_message", "content"],
+              properties: {
+                title: { type: "string" },
+                type: { type: "string", enum: ["concept", "example", "comparison", "process", "note", "summary"] },
+                layout: { type: "string", enum: ["bullets", "table", "steps", "cards", "definition"] },
+                key_message: { type: "string", description: "한 줄 핵심 메시지" },
+                content: { type: "string", description: "마크다운 본문" },
+                points: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      term: { type: "string" },
+                      explanation: { type: "string" },
+                      example: { type: "string" },
+                    },
+                    required: ["term", "explanation"],
+                  },
+                },
+              },
+            },
+          },
+          vocabulary: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { term: { type: "string" }, definition: { type: "string" } },
+              required: ["term", "definition"],
+            },
+          },
+          insights: {
+            type: "object",
+            properties: {
+              key_insights: { type: "array", items: { type: "string" } },
+              misunderstandings: { type: "array", items: { type: "string" } },
+              applications: { type: "array", items: { type: "string" } },
+              takeaway: { type: "string" },
+            },
+          },
+          study_tips: { type: "array", items: { type: "string" } },
+          tags: { type: "array", items: { type: "string" } },
+          metadata: {
+            type: "object",
+            properties: {
+              chapter_title: { type: "string" },
+              keywords: { type: "array", items: { type: "string" } },
+              prev_topic: { type: "string" },
+              next_topic: { type: "string" },
+              use_case: { type: "string" },
+            },
+          },
+        },
+      },
+    };
+
     const message = await getClient().messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 8192,
       system: systemPrompt,
+      tools: [REPORT_TOOL],
+      tool_choice: { type: "tool", name: "create_report" },
       messages: [{
         role: "user",
         content: `다음 학습 자료를 logic.summary 스킬에 따라 분석해주세요.\n\n파일명: ${filename}\n\n내용:\n${trimmedText}`
       }],
     });
 
-    const responseText = message.content[0].type === "text" ? message.content[0].text : "";
-
-    // JSON 파싱 (다단계 시도)
-    let reportData;
-    const cleaned = responseText
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/```\s*$/i, "")
-      .trim();
-
-    // 1차: 그대로 파싱
-    try {
-      reportData = JSON.parse(cleaned);
-    } catch {
-      // 2차: JSON 부분만 추출 (앞뒤에 설명 텍스트가 붙은 경우)
-      try {
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          reportData = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("no json");
-        }
-      } catch {
-        // 3차: fallback
-        reportData = {
-          title: filename || "학습 노트",
-          subject: "일반",
-          difficulty: "medium",
-          summary: responseText.substring(0, 300),
-          key_points: ["내용을 확인하세요"],
-          sections: [{ title: "전체 내용", content: responseText, type: "summary", layout: "bullets" }],
-          vocabulary: [],
-          study_tips: [],
-          tags: [],
-        };
-      }
-    }
+    // tool_use 응답에서 직접 구조화된 JSON 추출 — 파싱 불필요
+    const toolBlock = message.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+    const reportData = toolBlock?.input ?? {
+      title: filename || "학습 노트",
+      subject: "일반",
+      difficulty: "medium",
+      summary: "분석 결과를 생성하지 못했습니다.",
+      key_points: [],
+      sections: [],
+      vocabulary: [],
+      study_tips: [],
+      tags: [],
+    };
 
     return NextResponse.json({ report: reportData });
   } catch (err) {
