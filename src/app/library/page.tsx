@@ -1,137 +1,103 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  BookOpen, Search, Loader2, Tag, Trash2,
-  Download, Clock, Plus, Brain, X, RefreshCw,
-} from "lucide-react";
-import { Report } from "@/lib/supabase";
-import { DIFFICULTY_CONFIG } from "@/lib/constants";
+import { BookOpen, Search, Loader2, Tag, Plus, Brain, X } from "lucide-react";
 import ReportPreview from "@/components/ReportPreview";
+import ReportCard from "@/components/library/ReportCard";
 import { exportReportPdf } from "@/lib/pdf";
+import { useReports } from "@/hooks/useReports";
+import { useToast } from "@/components/Toast";
+import { summarize } from "@/lib/api";
+import type { Report } from "@/lib/types";
 
-// ──────────────────────────────────────────
 export default function LibraryPage() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { reports, isLoading, update, remove } = useReports();
+  const toast = useToast();
   const [search, setSearch] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
-  const fetchReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/reports");
-      const { reports: data } = await res.json();
-      setReports(data ?? []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchReports(); }, [fetchReports]);
-
-  // 탭 복귀 시 자동 갱신
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") fetchReports();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [fetchReports]);
-
   const handleDelete = async (id: string) => {
     if (!confirm("이 보고서를 삭제하시겠습니까?")) return;
     try {
-      await fetch(`/api/reports?id=${id}`, { method: "DELETE" });
-      setReports((prev) => prev.filter((r) => r.id !== id));
+      await remove(id);
       if (selectedId === id) setSelectedId(null);
+      toast.success("보고서를 삭제했습니다.");
     } catch (e) {
-      console.error(e);
+      toast.error(`삭제 실패: ${(e as Error).message}`);
     }
   };
 
   const handlePdf = async (report: Report) => {
     if (!report.id) return;
-    // 우측 패널 마운트 → DOM 렌더 → PDF 캡처
     setSelectedId(report.id);
-    // 다음 paint cycle까지 대기 (마크다운/이미지 렌더 시간 확보)
+    // 마크다운/이미지 렌더 시간 확보 (next paint cycle 후 캡처)
     await new Promise((r) => setTimeout(r, 600));
     try {
       await exportReportPdf("report-content", report.title);
+      toast.success("PDF를 다운로드했습니다.");
     } catch (e) {
       console.error(e);
-      alert("PDF 다운로드 실패. 다시 시도해주세요.");
+      toast.error("PDF 다운로드 실패. 다시 시도해주세요.");
     }
   };
 
-  // ── 재생성: 저장된 원본으로 AI 보고서 다시 생성 ──
   const handleRegenerate = async (report: Report) => {
     if (!report.id || !report.original_content) return;
-    if (!confirm("이 보고서를 현재 SKILL 로직으로 재생성합니다.\n원본은 그대로 유지되고, 슬라이드 내용만 새로 생성됩니다.\n진행할까요?")) return;
+    if (!confirm(
+      "이 보고서를 현재 SKILL 로직으로 재생성합니다.\n원본은 그대로 유지되고, 슬라이드 내용만 새로 생성됩니다.\n진행할까요?",
+    )) return;
 
     setRegeneratingId(report.id);
     try {
-      // 1) 원본으로 AI 요약 재실행
-      const sumRes = await fetch("/api/summarize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: report.original_content, filename: report.title }),
+      const { report: regenerated } = await summarize(report.original_content, report.title);
+      await update({
+        id: report.id,
+        title: regenerated.title || report.title,
+        subject: regenerated.subject ?? report.subject,
+        difficulty: regenerated.difficulty ?? report.difficulty,
+        summary: regenerated.summary ?? "",
+        key_points: regenerated.key_points ?? [],
+        sections: regenerated.sections ?? [],
+        vocabulary: regenerated.vocabulary ?? [],
+        study_tips: regenerated.study_tips ?? [],
+        tags: regenerated.tags ?? report.tags,
+        original_content: report.original_content,
       });
-      if (!sumRes.ok) {
-        const err = await sumRes.json();
-        throw new Error(err.error ?? "AI 재분석 실패");
-      }
-      const { report: regenerated } = await sumRes.json();
-
-      // 2) 기존 보고서 PUT — id, original_content, created_at 유지
-      const putRes = await fetch("/api/reports", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: report.id,
-          title: regenerated.title || report.title,
-          subject: regenerated.subject ?? report.subject,
-          difficulty: regenerated.difficulty ?? report.difficulty,
-          summary: regenerated.summary ?? "",
-          key_points: regenerated.key_points ?? [],
-          sections: regenerated.sections ?? [],
-          vocabulary: regenerated.vocabulary ?? [],
-          study_tips: regenerated.study_tips ?? [],
-          tags: regenerated.tags ?? report.tags,
-          original_content: report.original_content, // 원본은 보존
-        }),
-      });
-      if (!putRes.ok) throw new Error("저장 실패");
-      await fetchReports();
+      toast.success("보고서를 재생성했습니다.");
     } catch (e) {
-      alert(`재생성 실패: ${(e as Error).message}`);
+      toast.error(`재생성 실패: ${(e as Error).message}`);
     } finally {
       setRegeneratingId(null);
     }
   };
 
-  // ── 필터링 ──
-  const allTags = Array.from(new Set(reports.flatMap((r) => r.tags ?? [])));
-  const filtered = reports.filter((r) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q ||
-      r.title.toLowerCase().includes(q) ||
-      r.subject?.toLowerCase().includes(q) ||
-      r.summary?.toLowerCase().includes(q);
-    const matchTag = !selectedTag || (r.tags ?? []).includes(selectedTag);
-    return matchSearch && matchTag;
-  });
+  const allTags = useMemo(
+    () => Array.from(new Set(reports.flatMap((r) => r.tags ?? []))),
+    [reports],
+  );
 
-  const selectedReport = reports.find((r) => r.id === selectedId) ?? null;
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return reports.filter((r) => {
+      const matchSearch = !q ||
+        r.title.toLowerCase().includes(q) ||
+        r.subject?.toLowerCase().includes(q) ||
+        r.summary?.toLowerCase().includes(q);
+      const matchTag = !selectedTag || (r.tags ?? []).includes(selectedTag);
+      return matchSearch && matchTag;
+    });
+  }, [reports, search, selectedTag]);
+
+  const selectedReport = useMemo(
+    () => reports.find((r) => r.id === selectedId) ?? null,
+    [reports, selectedId],
+  );
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50">
-      {/* 헤더 */}
       <div className="no-print bg-white border-b border-gray-100 px-4 py-5">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
           <div>
@@ -152,7 +118,6 @@ export default function LibraryPage() {
 
       <div className="max-w-[1600px] mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-5 items-start">
-          {/* ────── 좌측: 카드 리스트 (sticky) ────── */}
           <div
             className={`no-print space-y-5 transition-all w-full ${
               selectedReport
@@ -160,7 +125,6 @@ export default function LibraryPage() {
                 : "lg:flex-1"
             }`}
           >
-            {/* 검색 & 필터 */}
             <div className="card p-4 space-y-3">
               <div className="relative">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -198,16 +162,14 @@ export default function LibraryPage() {
               )}
             </div>
 
-            {/* 로딩 */}
-            {loading && (
+            {isLoading && (
               <div className="card p-16 flex flex-col items-center gap-4">
                 <Loader2 size={32} className="animate-spin text-brand-400" />
                 <p className="text-gray-500">보고서를 불러오는 중...</p>
               </div>
             )}
 
-            {/* 빈 상태 */}
-            {!loading && filtered.length === 0 && (
+            {!isLoading && filtered.length === 0 && (
               <div className="card p-16 flex flex-col items-center gap-4 text-center">
                 <div className="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center">
                   <Brain size={36} className="text-gray-300" />
@@ -225,8 +187,7 @@ export default function LibraryPage() {
               </div>
             )}
 
-            {/* 보고서 카드들 */}
-            {!loading && filtered.length > 0 && (
+            {!isLoading && filtered.length > 0 && (
               <div className={`grid gap-4 ${selectedReport ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}>
                 {filtered.map((report) => (
                   <ReportCard
@@ -244,7 +205,6 @@ export default function LibraryPage() {
             )}
           </div>
 
-          {/* ────── 우측: 풀 미리보기 패널 ────── */}
           {selectedReport && (
             <div className="w-full lg:flex-1 min-w-0 print:w-full">
               <div className="no-print sticky top-4 z-10 mb-3 flex items-center justify-between gap-3 bg-white card px-4 py-3">
@@ -264,120 +224,9 @@ export default function LibraryPage() {
                 </button>
               </div>
 
-              <ReportPreview
-                report={selectedReport}
-                showActions={true}
-              />
+              <ReportPreview report={selectedReport} showActions={true} />
             </div>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────
-// 보고서 카드 (요약 - 클릭으로 우측 패널 열기)
-// ──────────────────────────────────────────
-interface ReportCardProps {
-  report: Report;
-  isSelected: boolean;
-  isRegenerating: boolean;
-  onSelect: () => void;
-  onDelete: () => void;
-  onPdf: () => void;
-  onRegenerate: () => void;
-}
-
-function ReportCard({ report, isSelected, isRegenerating, onSelect, onDelete, onPdf, onRegenerate }: ReportCardProps) {
-  const canRegenerate = !!report.original_content;
-  const diff = DIFFICULTY_CONFIG[report.difficulty as keyof typeof DIFFICULTY_CONFIG] ?? DIFFICULTY_CONFIG.medium;
-  const date = report.created_at
-    ? new Date(report.created_at).toLocaleDateString("ko-KR", {
-        year: "numeric", month: "long", day: "numeric",
-      })
-    : "";
-
-  return (
-    <div
-      onClick={onSelect}
-      className={`card overflow-hidden hover:shadow-md transition-all duration-200 group flex flex-col cursor-pointer ${
-        isSelected ? "ring-2 ring-brand-400 shadow-md" : ""
-      }`}
-    >
-      {/* 색상 상단 바 */}
-      <div className={`h-1.5 ${isSelected ? "bg-gradient-to-r from-brand-500 to-purple-600" : "bg-gradient-to-r from-brand-400 to-purple-500"}`} />
-
-      <div className="p-5 flex-1 flex flex-col">
-        {/* 메타 */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-base leading-snug line-clamp-2">
-              {report.title}
-            </h3>
-            <p className="text-sm text-gray-500 mt-0.5">{report.subject}</p>
-          </div>
-          <span className={`badge text-xs flex-shrink-0 ${diff.color}`}>{diff.label}</span>
-        </div>
-
-        {/* 요약 */}
-        <p className="text-sm text-gray-600 leading-relaxed line-clamp-3 flex-1 mb-4">
-          {report.summary}
-        </p>
-
-        {/* 태그 */}
-        {report.tags?.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-4">
-            {report.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="badge bg-gray-100 text-gray-500 text-xs">
-                {tag}
-              </span>
-            ))}
-            {report.tags.length > 3 && (
-              <span className="badge bg-gray-100 text-gray-400 text-xs">
-                +{report.tags.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* 날짜 */}
-        <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
-          <Clock size={12} />
-          {date}
-        </div>
-
-        {/* 액션 */}
-        <div className="flex items-center gap-2 border-t border-gray-50 pt-4">
-          <button
-            onClick={(e) => { e.stopPropagation(); onSelect(); }}
-            className="btn-secondary text-xs py-1.5 flex-1 justify-center"
-          >
-            {isSelected ? "보는 중" : "전체 보기"}
-            <BookOpen size={13} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onPdf(); }}
-            className="btn-secondary text-xs py-1.5 px-3"
-            title="PDF 다운로드"
-          >
-            <Download size={13} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
-            disabled={!canRegenerate || isRegenerating}
-            className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={canRegenerate ? "AI 보고서 재생성 (원본 보존)" : "원본이 저장돼 있지 않아 재생성 불가"}
-          >
-            {isRegenerating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="btn-danger text-xs py-1.5 px-3"
-            title="삭제"
-          >
-            <Trash2 size={13} />
-          </button>
         </div>
       </div>
     </div>

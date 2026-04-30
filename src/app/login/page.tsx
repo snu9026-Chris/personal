@@ -4,11 +4,13 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Lock, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
+import { useToast } from "@/components/Toast";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const errorMessage =
     errorParam === "unauthorized_email"
@@ -30,7 +32,7 @@ function LoginContent() {
     });
     if (error) {
       setLoading(false);
-      alert(`로그인 실패: ${error.message}`);
+      toast.error(`로그인 실패: ${error.message}`);
     }
     // 성공 시 Google로 리다이렉트되므로 추가 처리 불필요
   }

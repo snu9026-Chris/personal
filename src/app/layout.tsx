@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import SwrProvider from "@/components/SwrProvider";
+import { ToastProvider } from "@/components/Toast";
 
 export const metadata: Metadata = {
   title: "Personal Management | 학습 노트 & 목표 관리",
@@ -53,10 +55,12 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1">
-          {children}
-        </main>
+        <SwrProvider>
+          <ToastProvider>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+          </ToastProvider>
+        </SwrProvider>
       </body>
     </html>
   );

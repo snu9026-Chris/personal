@@ -9,6 +9,7 @@ import { Report, ReportSection } from "@/lib/supabase";
 import { DIFFICULTY_CONFIG, type DifficultyType } from "@/lib/constants";
 import MarkdownContent from "@/components/MarkdownContent";
 import { exportReportPdf } from "@/lib/pdf";
+import { useToast } from "@/components/Toast";
 
 // ──────────────────────────────────────────
 // 섹션 타입별 아이콘
@@ -208,6 +209,7 @@ export default function ReportPreview({
   const slides = buildSlides(report);
   const totalSlides = slides.length;
   const [pdfBusy, setPdfBusy] = useState(false);
+  const toast = useToast();
 
   // PDF 다운로드 — onPdfDownload prop이 있으면 그걸 호출 (호환), 없으면 내장 함수 사용
   async function handlePdf() {
@@ -218,9 +220,10 @@ export default function ReportPreview({
     setPdfBusy(true);
     try {
       await exportReportPdf("report-content", report.title || "report");
+      toast.success("PDF를 다운로드했습니다.");
     } catch (e) {
       console.error("PDF export failed:", e);
-      alert("PDF 다운로드 실패. 다시 시도해주세요.");
+      toast.error("PDF 다운로드 실패. 다시 시도해주세요.");
     } finally {
       setPdfBusy(false);
     }

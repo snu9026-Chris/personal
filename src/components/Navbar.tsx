@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BookOpen, Activity, Brain, FolderOpen, Terminal, LogIn, LogOut, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
+import { useToast } from "@/components/Toast";
 
 const navItems = [
   { href: "/study",    label: "업로드",         icon: Brain },
@@ -21,6 +22,7 @@ export default function Navbar() {
   const [authState, setAuthState] = useState<"in" | "out">("out");
   const [email, setEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -68,7 +70,7 @@ export default function Navbar() {
     });
     if (error) {
       setBusy(false);
-      alert(`로그인 실패: ${error.message}`);
+      toast.error(`로그인 실패: ${error.message}`);
     }
   }
 

@@ -1,139 +1,19 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
-  Upload, FileText, Sparkles, Save, Download, Edit3,
-  CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp,
-  X, Tag, BookOpen, Brain, Lightbulb, GraduationCap, HardDrive
+  Upload, FileText, Sparkles, Loader2,
+  AlertCircle, X, Brain, HardDrive
 } from "lucide-react";
-import { Report } from "@/lib/supabase";
-import { DIFFICULTY_CONFIG } from "@/lib/constants";
+import type { Report } from "@/lib/types";
 import ReportPreview from "@/components/ReportPreview";
+import { useGoogleDrivePicker } from "@/hooks/useGoogleDrivePicker";
+import { useReports } from "@/hooks/useReports";
+import { uploadDocument, summarize } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 
-// ──────────────────────────────────────────
-// 타입
-// ──────────────────────────────────────────
 type TabType = "upload" | "text";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare global {
-  interface Window {
-    gapi: any;
-    google: any;
-    onGooglePickerLoaded?: () => void;
-  }
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
-
-// ──────────────────────────────────────────
-// Google Drive Picker 훅
-// ──────────────────────────────────────────
-function useGoogleDrivePicker(onFilePicked: (file: File) => void) {
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isGoogleReady, setIsGoogleReady] = useState(false);
-  const tokenRef = useRef<string | null>(null);
-
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
-  const apiKey   = process.env.NEXT_PUBLIC_GOOGLE_API_KEY ?? "";
-
-  // Google API 스크립트 로드
-  useEffect(() => {
-    if (!clientId || !apiKey) return;
-
-    const loadScript = (src: string) =>
-      new Promise<void>((resolve) => {
-        if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-        const s = document.createElement("script");
-        s.src = src;
-        s.onload = () => resolve();
-        document.body.appendChild(s);
-      });
-
-    Promise.all([
-      loadScript("https://apis.google.com/js/api.js"),
-      loadScript("https://accounts.google.com/gsi/client"),
-    ]).then(() => {
-      if (window.gapi?.load) {
-        window.gapi.load("picker", () => setIsGoogleReady(true));
-      }
-    }).catch(() => {
-      // Google API 로드 실패 시 무시 (오프라인 등)
-    });
-  }, [clientId, apiKey]);
-
-  const openPicker = useCallback(async () => {
-    if (!clientId || !apiKey) {
-      alert("Google Drive 연동을 위해 .env.local에 NEXT_PUBLIC_GOOGLE_CLIENT_ID와 NEXT_PUBLIC_GOOGLE_API_KEY를 설정해주세요.");
-      return;
-    }
-    if (!isGoogleReady) {
-      alert("Google API 로딩 중입니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-
-    setIsGoogleLoading(true);
-
-    try {
-      // OAuth 토큰 요청
-      const token = await new Promise<string>((resolve, reject) => {
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: "https://www.googleapis.com/auth/drive.readonly",
-          callback: (resp: { error?: string; access_token: string }) => {
-            if (resp.error) reject(new Error(resp.error));
-            else resolve(resp.access_token);
-          },
-        });
-        client.requestAccessToken({ prompt: "" });
-      });
-
-      tokenRef.current = token;
-
-      // Picker 열기
-      const picker = new window.google.picker.PickerBuilder()
-        .addView(
-          new window.google.picker.DocsView()
-            .setIncludeFolders(true)
-            .setMimeTypes("application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword")
-        )
-        .setOAuthToken(token)
-        .setDeveloperKey(apiKey)
-        .setCallback(async (data: { action: string; docs?: { id: string; name: string }[] }) => {
-          if (data.action !== window.google.picker.Action.PICKED) return;
-          const doc = data.docs![0];
-          setIsGoogleLoading(true);
-
-          try {
-            // Google Drive에서 파일 다운로드
-            const res = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${doc.id}?alt=media`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const blob = await res.blob();
-            const pickedFile = new File([blob], doc.name, { type: blob.type });
-            onFilePicked(pickedFile);
-          } catch {
-            alert("파일 다운로드에 실패했습니다.");
-          } finally {
-            setIsGoogleLoading(false);
-          }
-        })
-        .build();
-
-      picker.setVisible(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  }, [clientId, apiKey, isGoogleReady, onFilePicked]);
-
-  return { openPicker, isGoogleLoading, isConfigured: !!(clientId && apiKey) };
-}
-
-// ──────────────────────────────────────────
-// 메인 컴포넌트
-// ──────────────────────────────────────────
 export default function StudyPage() {
   const [activeTab, setActiveTab] = useState<TabType>("upload");
   const [dragging, setDragging] = useState(false);
@@ -144,19 +24,17 @@ export default function StudyPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  const { create: createReport } = useReports();
+  const toast = useToast();
 
   const handleFilePicked = useCallback((f: File) => setFile(f), []);
   const { openPicker, isGoogleLoading, isConfigured: isGoogleConfigured } =
     useGoogleDrivePicker(handleFilePicked);
 
-  // ── 드래그앤드롭 ──
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(true);
-  }, []);
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragging(true); }, []);
   const handleDragLeave = useCallback(() => setDragging(false), []);
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -170,7 +48,6 @@ export default function StudyPage() {
     if (selected) setFile(selected);
   };
 
-  // ── 보고서 생성 ──
   const handleGenerate = async () => {
     setError(null);
     setReport(null);
@@ -182,16 +59,9 @@ export default function StudyPage() {
       let filename = "";
 
       if (activeTab === "upload" && file) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!uploadRes.ok) {
-          const err = await uploadRes.json();
-          throw new Error(err.error ?? "파일 업로드 실패");
-        }
-        const uploadData = await uploadRes.json();
-        text = uploadData.text;
-        filename = uploadData.filename;
+        const uploaded = await uploadDocument(file);
+        text = uploaded.text;
+        filename = uploaded.filename;
       } else {
         text = textInput;
         filename = "텍스트 입력";
@@ -199,72 +69,36 @@ export default function StudyPage() {
 
       if (!text.trim()) throw new Error("분석할 내용이 없습니다.");
 
-      const sumRes = await fetch("/api/summarize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, filename }),
-      });
-      if (!sumRes.ok) {
-        const err = await sumRes.json();
-        throw new Error(err.error ?? "AI 분석 실패");
-      }
-      const { report: generatedReport } = await sumRes.json();
-      // 재생성을 위해 원본 텍스트를 함께 보관
-      setReport({ ...generatedReport, original_content: text });
-      setExpandedSections(new Set([0]));
+      const { report: generated } = await summarize(text, filename);
+      setReport({ ...generated, original_content: text });
       setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // ── 저장 ──
   const handleSave = async () => {
     if (!report) return;
     setIsSaving(true);
     try {
-      const res = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(report),
-      });
-      if (!res.ok) throw new Error("저장 실패");
-      const { report: saved } = await res.json();
-      setSavedId(saved.id);
+      const saved = await createReport(report);
+      setSavedId(saved.id ?? null);
+      toast.success("라이브러리에 저장했습니다.");
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      setError(msg);
+      toast.error(`저장 실패: ${msg}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // PDF는 ReportPreview 내장 함수 사용 (onPdfDownload 미전달)
-
-  const toggleSection = (idx: number) => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      next.has(idx) ? next.delete(idx) : next.add(idx);
-      return next;
-    });
-  };
-
-  const updateReport = (field: keyof Report, value: unknown) => {
-    setReport((prev) => prev ? { ...prev, [field]: value } : null);
-  };
-
-  const updateSection = (idx: number, field: string, value: string) => {
-    if (!report) return;
-    const sections = [...report.sections];
-    sections[idx] = { ...sections[idx], [field]: value };
-    setReport({ ...report, sections });
-  };
-
-  // ──────────────────────────────────────────
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50">
-      {/* 상단 헤더 */}
       <div className="bg-white border-b border-gray-100 px-4 py-5">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -278,9 +112,7 @@ export default function StudyPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
-        {/* ────── 입력 패널 ────── */}
         <div className="lg:w-[420px] flex-shrink-0 space-y-4">
-          {/* 탭 */}
           <div className="card p-1 flex gap-1">
             {([["upload", "📄 Word 파일"], ["text", "✏️ 텍스트 입력"]] as [TabType, string][]).map(([tab, label]) => (
               <button
@@ -296,10 +128,8 @@ export default function StudyPage() {
             ))}
           </div>
 
-          {/* 업로드 탭 */}
           {activeTab === "upload" && (
             <div className="card p-5 space-y-4">
-              {/* 드롭존 */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -350,14 +180,12 @@ export default function StudyPage() {
                 )}
               </div>
 
-              {/* 구분선 */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-gray-100" />
                 <span className="text-xs text-gray-400 font-medium">또는</span>
                 <div className="flex-1 h-px bg-gray-100" />
               </div>
 
-              {/* Google Drive 버튼 */}
               <button
                 onClick={openPicker}
                 disabled={isGoogleLoading}
@@ -380,7 +208,6 @@ export default function StudyPage() {
                 )}
               </button>
 
-              {/* Google Drive 설정 안내 */}
               {!isGoogleConfigured && (
                 <p className="text-xs text-gray-400 text-center leading-relaxed">
                   Google Drive 연동은 .env.local에<br />
@@ -390,7 +217,6 @@ export default function StudyPage() {
             </div>
           )}
 
-          {/* 텍스트 탭 */}
           {activeTab === "text" && (
             <div className="card p-5">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -408,7 +234,6 @@ export default function StudyPage() {
             </div>
           )}
 
-          {/* 생성 버튼 */}
           <button
             onClick={handleGenerate}
             disabled={isProcessing || (activeTab === "upload" ? !file : !textInput.trim())}
@@ -421,7 +246,6 @@ export default function StudyPage() {
             )}
           </button>
 
-          {/* 에러 */}
           {error && (
             <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100">
               <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
@@ -432,20 +256,6 @@ export default function StudyPage() {
             </div>
           )}
 
-          {/* 저장 성공 */}
-          {savedId && (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-              <CheckCircle size={18} className="text-emerald-500" />
-              <div>
-                <p className="text-sm font-medium text-emerald-700">저장 완료!</p>
-                <a href="/library" className="text-sm text-emerald-600 underline">
-                  내 보고서에서 확인하기 →
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* 사용 안내 */}
           {!report && !isProcessing && (
             <div className="card p-5 bg-brand-50 border-brand-100">
               <p className="text-sm font-medium text-brand-700 mb-2">💡 사용 방법</p>
@@ -459,7 +269,6 @@ export default function StudyPage() {
           )}
         </div>
 
-        {/* ────── 미리보기 패널 ────── */}
         <div className="flex-1 min-w-0" ref={previewRef}>
           {isProcessing ? (
             <div className="card p-12 flex flex-col items-center justify-center gap-4 text-center">
@@ -497,4 +306,3 @@ export default function StudyPage() {
     </div>
   );
 }
-
